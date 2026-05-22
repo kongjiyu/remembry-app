@@ -43,7 +43,26 @@ export default function ProjectsPage() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        Promise.all([fetchProjects(), fetchEvents()]).finally(() => setLoading(false));
+        let cancelled = false;
+        async function loadData() {
+            try {
+                const [projectsRes, eventsRes] = await Promise.all([
+                    apiFetch('/api/projects'),
+                    apiFetch('/api/events'),
+                ]);
+                if (cancelled) return;
+                const projectsData = projectsRes.ok ? await projectsRes.json() : { projects: [] };
+                const eventsData = eventsRes.ok ? await eventsRes.json() : { meetings: [] };
+                setProjects(projectsData.projects || []);
+                setEvents(eventsData.meetings || []);
+            } catch (error) {
+                if (!cancelled) console.error('Error fetching data:', error);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        loadData();
+        return () => { cancelled = true; };
     }, []);
 
     const fetchProjects = async () => {
@@ -54,19 +73,6 @@ export default function ProjectsPage() {
             setProjects(data.projects || []);
         } catch (error) {
             console.error('Error fetching projects:', error);
-        }
-    };
-
-    const fetchEvents = async () => {
-        try {
-            const response = await apiFetch('/api/meetings');
-            if (!response.ok) throw new Error('Failed to fetch meetings');
-            const data = await response.json();
-            const rawEvents: Record<string, unknown>[] = data.meetings || [];
-            const projectMap = buildProjectMap(projects);
-            setEvents(rawEvents.map(m => normalizeMeeting(m, projectMap)));
-        } catch (error) {
-            console.error('Error fetching meetings:', error);
         }
     };
 

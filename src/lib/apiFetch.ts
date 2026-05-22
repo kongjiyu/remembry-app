@@ -56,6 +56,12 @@ const TAURI_COMMANDS: TauriCommandEntry[] = [
     return { params: { name: b?.name || "", description: b?.description || null, goals: b?.goals || null, color: b?.color || null } };
   }},
   { pattern: "/api/projects/:projectId", method: "DELETE", command: "delete_project", extractParams: (p) => ({ projectId: matchRoute("/api/projects/:projectId", p)?.projectId || "" }) },
+  { pattern: "/api/projects/:projectId", method: "GET", command: "get_project", extractParams: (p) => ({ project_id: matchRoute("/api/projects/:projectId", p)?.projectId || "" }) },
+  { pattern: "/api/projects/:projectId", method: "PUT", command: "update_project", extractParams: (p, _, body) => {
+    const m = matchRoute("/api/projects/:projectId", p);
+    const b = body as { name?: string; description?: string; goals?: string; color?: string } | null;
+    return { project_id: m?.projectId || "", params: { name: b?.name || "", description: b?.description || null, goals: b?.goals || null, color: b?.color || null } };
+  }},
   { pattern: "/api/meetings", method: "GET", command: "list_meetings", extractParams: (_, q) => {
     const params: Record<string, unknown> = {};
     const pid = q?.get("project_id");

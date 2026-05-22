@@ -95,3 +95,40 @@ pub fn get_project(project_id: &str) -> Result<Option<Project>, String> {
         Ok(rows.next().transpose().map_err(|e| e.to_string())?)
     }).map_err(|e| e.to_string())
 }
+
+pub fn update_project(project_id: &str, display_name: &str, color: Option<&str>, description: Option<&str>, goals: Option<&str>) -> Result<Project, String> {
+    with_db(|conn| {
+        let color = color.unwrap_or("bg-blue-500");
+        let description = description.unwrap_or("");
+        let goals = goals.unwrap_or("");
+
+        let updated = conn.execute(
+            "UPDATE projects SET display_name = ?1, color = ?2, description = ?3, goals = ?4 WHERE id = ?5",
+            params![display_name, color, description, goals, project_id],
+        ).map_err(|e| e.to_string())?;
+
+        if updated == 0 {
+            return Err("Project not found".to_string());
+        }
+
+        let mut stmt = conn.prepare(
+            "SELECT id, display_name, color, description, goals, created_at FROM projects WHERE id = ?1"
+        ).map_err(|e| e.to_string())?;
+
+        let mut rows = stmt.query_map(params![project_id], |row| {
+            Ok(Project {
+                id: row.get(0)?,
+                display_name: row.get(1)?,
+                color: row.get::<_, Option<String>>(2)?.unwrap_or_else(|| "bg-blue-500".to_string()),
+                description: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                goals: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                created_at: row.get(5)?,
+            })
+        }).map_err(|e| e.to_string())?;
+
+        rows.next()
+            .transpose()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Project not found after update".to_string())
+    }).map_err(|e| e.to_string())
+}

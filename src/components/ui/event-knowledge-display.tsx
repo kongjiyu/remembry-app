@@ -26,10 +26,7 @@ import { toast } from "sonner";
 import {
     EventKnowledge,
     KnowledgeItem,
-    QuestionItem,
-    TaskItem,
     ConceptItem,
-    Evidence,
     normalizeKnowledge,
 } from "@/lib/eventKnowledge";
 
@@ -40,7 +37,7 @@ interface LanguageDropdownProps {
     disabled?: boolean;
 }
 
-function LanguageDropdown({ currentLanguage, availableLanguages, onSelect, disabled }: LanguageDropdownProps) {
+function LanguageDropdown({ currentLanguage, availableLanguages: _availableLanguages, onSelect, disabled }: LanguageDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -143,42 +140,6 @@ const EVENT_TYPE_SECTIONS: Record<string, string[]> = {
 };
 
 const DEFAULT_SECTIONS = ["decisions", "action_items", "questions", "insights"];
-
-interface EvidenceSnippetsProps {
-    evidence: Evidence[];
-}
-
-function EvidenceSnippets({ evidence }: EvidenceSnippetsProps) {
-    const [expanded, setExpanded] = useState(false);
-
-    if (!evidence || evidence.length === 0) return null;
-
-    const visible = expanded ? evidence : evidence.slice(0, 2);
-    const hasMore = evidence.length > 2;
-
-    return (
-        <div className="mt-2 space-y-2">
-            {visible.map((e, i) => (
-                <div key={i} className="text-xs text-muted-foreground bg-muted/50 rounded p-2 italic">
-                    <span className="font-medium not-italic">&ldquo;{e.snippet}&rdquo;</span>
-                    {e.speaker && <span className="block mt-1 text-muted-foreground/70">— {e.speaker}</span>}
-                </div>
-            ))}
-            {hasMore && (
-                <button
-                    onClick={() => setExpanded(!expanded)}
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                    {expanded ? (
-                        <><ChevronDown className="size-3" /> Show fewer</>
-                    ) : (
-                        <><ChevronRight className="size-3" /> +{evidence.length - 2} more</>
-                    )}
-                </button>
-            )}
-        </div>
-    );
-}
 
 // Find related items based on tags
 function findRelatedItems<T extends { tags: string[]; id: string }>(
@@ -414,23 +375,7 @@ function DigestGrid({ knowledge }: DigestGridProps) {
     );
 }
 
-interface PrimaryItemProps {
-    item: KnowledgeItem;
-    knowledge: EventKnowledge;
-    icon: React.ReactNode;
-    iconColor: string;
-}
-
-// Section metadata for rendering
-interface SectionMeta {
-    key: string;
-    label: string;
-    icon: React.ReactNode;
-    iconColor: string;
-    count?: number;
-}
-
-function PrimaryItem({ item, knowledge }: { item: KnowledgeItem; knowledge: EventKnowledge }) {
+function _PrimaryItem({ item, knowledge }: { item: KnowledgeItem; knowledge: EventKnowledge }) {
     return (
         <div className="flex gap-3 text-sm">
             <div className="mt-1 shrink-0" />
@@ -652,7 +597,7 @@ export function EventKnowledgeDisplay({ eventId, initialLanguage = "en", meeting
     }
 
     // Get section order for this event type
-    const primarySections = EVENT_TYPE_SECTIONS[knowledge.event_type] || DEFAULT_SECTIONS;
+    const _primarySections = EVENT_TYPE_SECTIONS[knowledge.event_type] || DEFAULT_SECTIONS;
 
     // Group observations by subtype for explore section
     const observationsBySubtype = knowledge.observations?.reduce((acc, obs) => {
@@ -661,9 +606,6 @@ export function EventKnowledgeDisplay({ eventId, initialLanguage = "en", meeting
         acc[key].push(obs);
         return acc;
     }, {} as Record<string, KnowledgeItem[]>) || {};
-
-    // Highlights: max 5 key_points as digest bullets
-    const highlights = (knowledge.key_points || []).slice(0, 5);
 
     return (
         <div className="space-y-6">

@@ -6,11 +6,9 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Send, Loader2, MessageCircle, ExternalLink, Calendar } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
-import { useRouter } from "next/navigation";
 
 interface AskSource {
     id: string;
@@ -38,7 +36,6 @@ function formatDate(dateString?: string) {
 
 function AskContent() {
     const searchParams = useSearchParams();
-    const router = useRouter();
 
     const scope = searchParams.get("scope") || "project";
     const projectName = searchParams.get("projectName") || "";

@@ -49,6 +49,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { EditProjectDialog } from "@/components/ui/edit-project-dialog";
 
 interface Meeting {
     id: string;
@@ -152,65 +153,67 @@ function ProjectDetailContent() {
     const [isDeletingMeeting, setIsDeletingMeeting] = useState(false);
     const [projectOverview, setProjectOverview] = useState<ProjectKnowledgeOverview | null>(null);
     const [expandedTabs, setExpandedTabs] = useState<Record<string, boolean>>({});
+    const [showEditDialog, setShowEditDialog] = useState(false);
 
     const toggleExpanded = (tab: string) => {
         setExpandedTabs(prev => ({ ...prev, [tab]: !prev[tab] }));
     };
 
     useEffect(() => {
-        if (projectName) {
-            fetchProjectDetails();
+        if (!projectName) return;
+
+        let cancelled = false;
+        async function loadProject() {
+            try {
+                setLoading(true);
+
+                const projectsResponse = await apiFetch('/api/projects');
+                if (!projectsResponse.ok || cancelled) return;
+                const projectsData = await projectsResponse.json();
+                const foundProject = projectsData.projects?.find((p: ProjectDetail) => p.id === projectName);
+
+                if (!foundProject || cancelled) {
+                    setLoading(false);
+                    return;
+                }
+
+                const meetingsResponse = await apiFetch(`/api/meetings?project_id=${encodeURIComponent(projectName)}`);
+                const meetingsData = meetingsResponse.ok ? await meetingsResponse.json() : { meetings: [] };
+                const meetings: Meeting[] = (meetingsData.meetings || []).map((m: Record<string, unknown>) => ({
+                    id: String(m.id || ''),
+                    display_name: String(m.title || m.display_name || 'Untitled Event'),
+                    uploadTime: String(m.created_at || ''),
+                    mimeType: String(m.mime_type || m.file_type || ''),
+                    knowledge_by_language: (m.knowledge_by_language as Record<string, unknown> | null) || null,
+                    default_language: (m.default_language as string | null) || null,
+                }));
+
+                const meetingsForOverview: MeetingWithKnowledge[] = meetings.map(m => ({
+                    id: m.id,
+                    title: m.display_name,
+                    created_at: m.uploadTime || '',
+                    knowledge_by_language: m.knowledge_by_language || null,
+                    default_language: m.default_language || null,
+                }));
+
+                if (!cancelled) {
+                    setProjectOverview(aggregateProjectKnowledge(meetingsForOverview));
+                    setProject({
+                        ...foundProject,
+                        meetings,
+                        meeting_count: meetings.length,
+                    });
+                }
+            } catch (error) {
+                if (!cancelled) console.error('Error fetching project:', error);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
         }
+
+        loadProject();
+        return () => { cancelled = true; };
     }, [projectName]);
-
-    const fetchProjectDetails = async () => {
-        try {
-            setLoading(true);
-
-            const projectsResponse = await apiFetch('/api/projects');
-            if (!projectsResponse.ok) {
-                throw new Error('Failed to fetch projects');
-            }
-            const projectsData = await projectsResponse.json();
-            const foundProject = projectsData.projects?.find((p: ProjectDetail) => p.id === projectName);
-
-            if (!foundProject) {
-                console.error('Project not found');
-                setLoading(false);
-                return;
-            }
-
-            const meetingsResponse = await apiFetch(`/api/meetings?project_id=${encodeURIComponent(projectName)}`);
-            const meetingsData = meetingsResponse.ok ? await meetingsResponse.json() : { meetings: [] };
-            const meetings: Meeting[] = (meetingsData.meetings || []).map((m: Record<string, unknown>) => ({
-                id: String(m.id || ''),
-                display_name: String(m.title || m.display_name || 'Untitled Event'),
-                uploadTime: String(m.created_at || ''),
-                mimeType: String(m.mime_type || m.file_type || ''),
-                knowledge_by_language: (m.knowledge_by_language as Record<string, unknown> | null) || null,
-                default_language: (m.default_language as string | null) || null,
-            }));
-
-            const meetingsForOverview: MeetingWithKnowledge[] = meetings.map(m => ({
-                id: m.id,
-                title: m.display_name,
-                created_at: m.uploadTime || '',
-                knowledge_by_language: m.knowledge_by_language || null,
-                default_language: m.default_language || null,
-            }));
-            setProjectOverview(aggregateProjectKnowledge(meetingsForOverview));
-
-            setProject({
-                ...foundProject,
-                meetings,
-                meeting_count: meetings.length,
-            });
-        } catch (error) {
-            console.error('Error fetching project:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const filteredEvents = (project?.meetings || []).filter(meeting =>
         meeting.display_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -355,6 +358,9 @@ function ProjectDetailContent() {
                                 Upload Event
                             </Link>
                         </Button>
+                        <Button variant="outline" onClick={() => setShowEditDialog(true)}>
+                            Edit Project
+                        </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="icon">
@@ -426,6 +432,26 @@ function ProjectDetailContent() {
                 </div>
 
                 {/* Project Knowledge Overview */}
+                {project.description && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Description</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm">{project.description}</p>
+                        </CardContent>
+                    </Card>
+                )}
+                {project.goals && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Goals</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm whitespace-pre-wrap">{project.goals}</p>
+                        </CardContent>
+                    </Card>
+                )}
                 {projectOverview && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -780,6 +806,15 @@ function ProjectDetailContent() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <EditProjectDialog
+                open={showEditDialog}
+                onOpenChange={setShowEditDialog}
+                project={project}
+                onSuccess={(updatedProject) => {
+                    setProject(prev => prev ? { ...prev, ...updatedProject } : null);
+                }}
+            />
         </DashboardLayout>
     );
 }

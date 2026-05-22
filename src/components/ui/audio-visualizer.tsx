@@ -8,13 +8,6 @@ interface AudioVisualizerProps {
     className?: string;
 }
 
-// Resolve CSS variable to canvas color
-function getCssVarColor(variable: string, fallback: string): string {
-    if (typeof window === "undefined") return fallback;
-    const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
-    return value || fallback;
-}
-
 // Get theme-appropriate muted line color
 function getMutedLineColor(): string {
     const isDark = document.documentElement.classList.contains("dark");

@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FolderKanban, Plus } from "lucide-react";
 import { apiFetch } from "@/lib/apiFetch";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function NewProjectPage() {
