@@ -31,6 +31,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatMimeBadgeLabel } from "@/lib/meetingViews";
 import {
     aggregateProjectKnowledge,
+    filterProjectKnowledgeOverview,
     MeetingWithKnowledge,
     ProjectKnowledgeOverview,
     ProjectKnowledgeItem,
@@ -152,8 +153,12 @@ function ProjectDetailContent() {
     const [showDeleteMeetingDialog, setShowDeleteMeetingDialog] = useState(false);
     const [isDeletingMeeting, setIsDeletingMeeting] = useState(false);
     const [projectOverview, setProjectOverview] = useState<ProjectKnowledgeOverview | null>(null);
+    const [overviewSearchQuery, setOverviewSearchQuery] = useState("");
     const [expandedTabs, setExpandedTabs] = useState<Record<string, boolean>>({});
     const [showEditDialog, setShowEditDialog] = useState(false);
+
+    const isOverviewSearching = overviewSearchQuery.trim().length > 0;
+    const displayedOverview = projectOverview ? filterProjectKnowledgeOverview(projectOverview, overviewSearchQuery) : null;
 
     const toggleExpanded = (tab: string) => {
         setExpandedTabs(prev => ({ ...prev, [tab]: !prev[tab] }));
@@ -454,52 +459,62 @@ function ProjectDetailContent() {
                 )}
                 {projectOverview && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-4">
                             <h2 className="text-xl font-semibold">Project Overview</h2>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search overview..."
+                                    className="pl-9 max-w-xs h-8 text-sm"
+                                    value={overviewSearchQuery}
+                                    onChange={(e) => setOverviewSearchQuery(e.target.value)}
+                                />
+                            </div>
                         </div>
+                        {displayedOverview && (
                         <Tabs defaultValue="all" className="w-full">
                             <TabsList className="w-fit max-w-full justify-start bg-transparent gap-1 p-0">
                                 <TabsTrigger value="all" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
                                     All
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.allItems.length}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.allCount}</Badge>
                                 </TabsTrigger>
                                 <TabsTrigger value="decisions" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
                                     <Gavel className="size-4 text-orange-500" />
                                     Decisions
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.decisionsCount}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.decisionsCount}</Badge>
                                 </TabsTrigger>
                                 <TabsTrigger value="action_items" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
                                     <ListTodo className="size-4 text-green-500" />
                                     Action Items
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.actionItemsCount}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.actionItemsCount}</Badge>
                                 </TabsTrigger>
                                 <TabsTrigger value="questions" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
                                     <HelpCircle className="size-4 text-purple-500" />
                                     Questions
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.questionsCount}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.questionsCount}</Badge>
                                 </TabsTrigger>
                                 <TabsTrigger value="needs_extraction" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
                                     <Sparkles className="size-4 text-muted-foreground" />
                                     Needs Extraction
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.missingEvents.length}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.missingEventsCount}</Badge>
                                 </TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="all" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.allItems.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No knowledge extracted yet.</p>
+                                    {displayedOverview.allItems.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No knowledge extracted yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["all"] ? projectOverview.allItems : projectOverview.allItems.slice(0, 4)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["all"] ? displayedOverview.allItems : displayedOverview.allItems.slice(0, 4)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.allItems.length > 4 && (
+                                            {!isOverviewSearching && displayedOverview.allItems.length > 4 && (
                                                 <button
                                                     onClick={() => toggleExpanded("all")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["all"] ? "Show fewer" : `Show all ${projectOverview.allItems.length}`}
+                                                    {expandedTabs["all"] ? "Show fewer" : `Show all ${displayedOverview.allItems.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -509,19 +524,19 @@ function ProjectDetailContent() {
 
                             <TabsContent value="decisions" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.decisions.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No decisions yet.</p>
+                                    {displayedOverview.decisions.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No decisions yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["decisions"] ? projectOverview.decisions : projectOverview.decisions.slice(0, 3)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["decisions"] ? displayedOverview.decisions : displayedOverview.decisions.slice(0, 3)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.decisions.length > 3 && (
+                                            {!isOverviewSearching && displayedOverview.decisions.length > 3 && (
                                                 <button
                                                     onClick={() => toggleExpanded("decisions")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["decisions"] ? "Show fewer" : `Show all ${projectOverview.decisions.length}`}
+                                                    {expandedTabs["decisions"] ? "Show fewer" : `Show all ${displayedOverview.decisions.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -531,19 +546,19 @@ function ProjectDetailContent() {
 
                             <TabsContent value="action_items" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.actionItems.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No action items yet.</p>
+                                    {displayedOverview.actionItems.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No action items yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["action_items"] ? projectOverview.actionItems : projectOverview.actionItems.slice(0, 3)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["action_items"] ? displayedOverview.actionItems : displayedOverview.actionItems.slice(0, 3)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.actionItems.length > 3 && (
+                                            {!isOverviewSearching && displayedOverview.actionItems.length > 3 && (
                                                 <button
                                                     onClick={() => toggleExpanded("action_items")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["action_items"] ? "Show fewer" : `Show all ${projectOverview.actionItems.length}`}
+                                                    {expandedTabs["action_items"] ? "Show fewer" : `Show all ${displayedOverview.actionItems.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -553,19 +568,19 @@ function ProjectDetailContent() {
 
                             <TabsContent value="questions" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.questions.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No questions yet.</p>
+                                    {displayedOverview.questions.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No questions yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["questions"] ? projectOverview.questions : projectOverview.questions.slice(0, 3)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["questions"] ? displayedOverview.questions : displayedOverview.questions.slice(0, 3)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.questions.length > 3 && (
+                                            {!isOverviewSearching && displayedOverview.questions.length > 3 && (
                                                 <button
                                                     onClick={() => toggleExpanded("questions")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["questions"] ? "Show fewer" : `Show all ${projectOverview.questions.length}`}
+                                                    {expandedTabs["questions"] ? "Show fewer" : `Show all ${displayedOverview.questions.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -575,11 +590,11 @@ function ProjectDetailContent() {
 
                             <TabsContent value="needs_extraction" className="mt-4">
                                 <div className="flex flex-wrap gap-2">
-                                    {projectOverview.missingEvents.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">All events have knowledge extracted.</p>
+                                    {displayedOverview.missingEvents.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "All events have knowledge extracted."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["needs_extraction"] ? projectOverview.missingEvents : projectOverview.missingEvents.slice(0, 6)).map((evt) => {
+                                            {(isOverviewSearching || expandedTabs["needs_extraction"] ? displayedOverview.missingEvents : displayedOverview.missingEvents.slice(0, 6)).map((evt) => {
                                                 const meetingUrl = `/events/detail?id=${encodeURIComponent(evt.id)}&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`;
                                                 return (
                                                     <Link
@@ -593,12 +608,12 @@ function ProjectDetailContent() {
                                                     </Link>
                                                 );
                                             })}
-                                            {projectOverview.missingEvents.length > 6 && (
+                                            {!isOverviewSearching && displayedOverview.missingEvents.length > 6 && (
                                                 <button
                                                     onClick={() => toggleExpanded("needs_extraction")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["needs_extraction"] ? "Show fewer" : `Show all ${projectOverview.missingEvents.length}`}
+                                                    {expandedTabs["needs_extraction"] ? "Show fewer" : `Show all ${displayedOverview.missingEvents.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -606,6 +621,7 @@ function ProjectDetailContent() {
                                 </div>
                             </TabsContent>
                         </Tabs>
+                        )}
                     </div>
                 )}
 

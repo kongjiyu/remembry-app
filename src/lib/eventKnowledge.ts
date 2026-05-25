@@ -369,6 +369,97 @@ export interface MeetingWithKnowledge {
     default_language: string | null;
 }
 
+export interface FilteredProjectKnowledgeOverview {
+    allItems: ProjectKnowledgeItem[];
+    decisions: ProjectKnowledgeItem[];
+    actionItems: ProjectKnowledgeItem[];
+    questions: ProjectKnowledgeItem[];
+    missingEvents: Array<{
+        id: string;
+        title: string;
+        date: string;
+    }>;
+    allCount: number;
+    decisionsCount: number;
+    actionItemsCount: number;
+    questionsCount: number;
+    missingEventsCount: number;
+}
+
+/**
+ * Filter project knowledge overview by a case-insensitive, trimmed search query.
+ * Matches against content, source event title, tags, item type label, assignee,
+ * due date, question status, and answer fields.
+ * Needs Extraction rows are matched against event title and formatted/raw date.
+ */
+export function filterProjectKnowledgeOverview(
+    overview: ProjectKnowledgeOverview,
+    query: string
+): FilteredProjectKnowledgeOverview {
+    const q = query.trim().toLowerCase();
+
+    if (!q) {
+        return {
+            allItems: overview.allItems,
+            decisions: overview.decisions,
+            actionItems: overview.actionItems,
+            questions: overview.questions,
+            missingEvents: overview.missingEvents,
+            allCount: overview.allItems.length,
+            decisionsCount: overview.decisionsCount,
+            actionItemsCount: overview.actionItemsCount,
+            questionsCount: overview.questionsCount,
+            missingEventsCount: overview.missingEvents.length,
+        };
+    }
+
+    function itemMatches(item: ProjectKnowledgeItem): boolean {
+        const searchable =
+            [
+                item.content,
+                item.sourceEventTitle,
+                ...item.tags,
+                item.itemType,
+                item.assignee ?? "",
+                item.dueDate ?? "",
+                item.questionStatus ?? "",
+                item.answer ?? "",
+            ]
+                .join(" ")
+                .toLowerCase();
+        return searchable.includes(q);
+    }
+
+    function needsExtractionMatches(evt: { id: string; title: string; date: string }): boolean {
+        const formattedDate = new Date(evt.date).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        });
+        const searchable = [evt.title, evt.date, formattedDate].join(" ").toLowerCase();
+        return searchable.includes(q);
+    }
+
+    const filteredDecisions = overview.decisions.filter(itemMatches);
+    const filteredActionItems = overview.actionItems.filter(itemMatches);
+    const filteredQuestions = overview.questions.filter(itemMatches);
+    const filteredAll = overview.allItems.filter(itemMatches);
+    const filteredMissing = overview.missingEvents.filter(needsExtractionMatches);
+
+    return {
+        allItems: filteredAll,
+        decisions: filteredDecisions,
+        actionItems: filteredActionItems,
+        questions: filteredQuestions,
+        missingEvents: filteredMissing,
+        allCount: filteredAll.length,
+        decisionsCount: filteredDecisions.length,
+        actionItemsCount: filteredActionItems.length,
+        questionsCount: filteredQuestions.length,
+        missingEventsCount: filteredMissing.length,
+    };
+}
+
 /**
  * Aggregate knowledge from all meetings in a project using 'en' or 'default'.
  * Falls back to 'default' when 'en' is absent.

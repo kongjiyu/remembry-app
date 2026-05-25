@@ -63,7 +63,7 @@ function LanguageDropdown({ currentLanguage, availableLanguages: _availableLangu
                 type="button"
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 disabled={disabled}
-                className="flex items-center gap-1.5 text-sm border rounded-md px-2 py-1 bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 text-sm border rounded-md px-2 py-1 bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span className="text-muted-foreground">Language:</span>
                 <span className="font-medium">{currentLang?.name ?? currentLanguage}</span>
@@ -82,7 +82,7 @@ function LanguageDropdown({ currentLanguage, availableLanguages: _availableLangu
                                     onSelect(lang.code);
                                     setIsOpen(false);
                                 }}
-                                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-muted transition-colors ${
+                                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-muted transition-colors cursor-pointer ${
                                     isSelected ? 'bg-muted font-medium' : ''
                                 }`}
                             >
@@ -185,7 +185,7 @@ function InlineContext({ item, knowledge }: InlineContextProps) {
         <div className="mt-2">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
                 <Eye className="size-3" />
                 {isOpen ? "Hide" : "Show"} context

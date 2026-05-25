@@ -745,7 +745,7 @@ export default function NewEventPage() {
                                             {tag}
                                             <button
                                                 onClick={() => handleRemoveTag(tag)}
-                                                className="ml-1 hover:text-destructive rounded-sm"
+                                                className="ml-1 hover:text-destructive rounded-sm cursor-pointer"
                                                 type="button"
                                             >
                                                 <X className="size-3" />
