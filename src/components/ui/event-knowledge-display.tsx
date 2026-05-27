@@ -28,6 +28,7 @@ import {
     KnowledgeItem,
     ConceptItem,
     normalizeKnowledge,
+    groupObservationsWithContent,
 } from "@/lib/eventKnowledge";
 
 interface LanguageDropdownProps {
@@ -599,13 +600,9 @@ export function EventKnowledgeDisplay({ eventId, initialLanguage = "en", meeting
     // Get section order for this event type
     const _primarySections = EVENT_TYPE_SECTIONS[knowledge.event_type] || DEFAULT_SECTIONS;
 
-    // Group observations by subtype for explore section
-    const observationsBySubtype = knowledge.observations?.reduce((acc, obs) => {
-        const key = obs.subtype || "general";
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(obs);
-        return acc;
-    }, {} as Record<string, KnowledgeItem[]>) || {};
+    const groupedObservations = groupObservationsWithContent(knowledge.observations || []);
+    const hasUsableObservations = groupedObservations.length > 0;
+    const hasRelatedTopics = (knowledge.related_topics?.length ?? 0) > 0;
 
     return (
         <div className="space-y-6">
@@ -716,11 +713,11 @@ export function EventKnowledgeDisplay({ eventId, initialLanguage = "en", meeting
                     )}
 
                     {/* Context: Observations, Related Topics */}
-                    {(knowledge.observations?.length > 0 || knowledge.related_topics?.length > 0) && (
+                    {(hasUsableObservations || hasRelatedTopics) && (
                         <div>
                             <h4 className="text-sm font-medium text-muted-foreground mb-2">Context</h4>
                             <div className="grid gap-4 md:grid-cols-2">
-                                {knowledge.observations?.length > 0 && (
+                                {hasUsableObservations && (
                                     <Card>
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-sm flex items-center gap-2">
@@ -729,15 +726,22 @@ export function EventKnowledgeDisplay({ eventId, initialLanguage = "en", meeting
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent className="pt-0">
-                                            <ul className="space-y-1">
-                                                {Object.entries(observationsBySubtype).slice(0, 3).map(([subtype, items]) => (
-                                                    <li key={subtype} className="text-sm text-muted-foreground capitalize">{subtype}: {items.length}</li>
+                                            <ul className="space-y-2">
+                                                {groupedObservations.map(({ label, items }) => (
+                                                    <li key={label}>
+                                                        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                                                        <ul className="mt-1 space-y-1">
+                                                            {items.map((obs, i) => (
+                                                                <li key={i} className="text-sm text-muted-foreground pl-2 border-l-2 border-muted">{obs.content}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </li>
                                                 ))}
                                             </ul>
                                         </CardContent>
                                     </Card>
                                 )}
-                                {knowledge.related_topics?.length > 0 && (
+                                {hasRelatedTopics && (
                                     <Card>
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-sm flex items-center gap-2">

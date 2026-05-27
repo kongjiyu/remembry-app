@@ -329,6 +329,50 @@ function normalizeLegacyKeyPoints(raw: unknown): KnowledgeItem[] {
 }
 
 // ---------------------------------------------------------------------------
+// Observation Display Helpers
+// ---------------------------------------------------------------------------
+
+/** Convert snake_case subtype keys to readable labels.
+ *  student_difficulty → "Student Difficulty"
+ *  balancing_issue → "Balancing Issue"
+ *  missing/null → "General"
+ */
+export function subtypeLabel(subtype: string | undefined): string {
+    if (!subtype) return "General";
+    return subtype
+        .split("_")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}
+
+/** Group observations by subtype, filtering out items with no content.
+ *  Returns entries sorted by label (general last), each containing only items with non-empty content.
+ */
+export function groupObservationsWithContent(
+    observations: KnowledgeItem[]
+): Array<{ label: string; items: KnowledgeItem[] }> {
+    const groups = new Map<string, KnowledgeItem[]>();
+
+    for (const obs of observations) {
+        if (!obs.content?.trim()) continue;
+        const key = obs.subtype || "general";
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(obs);
+    }
+
+    return Array.from(groups.entries())
+        .sort(([a], [b]) => {
+            if (a === "general") return 1;
+            if (b === "general") return -1;
+            return a.localeCompare(b);
+        })
+        .map(([subtype, items]) => ({
+            label: subtypeLabel(subtype),
+            items,
+        }));
+}
+
+// ---------------------------------------------------------------------------
 // Project Overview Types
 // ---------------------------------------------------------------------------
 
