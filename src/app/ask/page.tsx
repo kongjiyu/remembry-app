@@ -216,7 +216,7 @@ function AskContent() {
                                             <button
                                                 key={i}
                                                 onClick={() => handleFollowUp(q)}
-                                                className="text-left text-sm px-3 py-2 rounded-lg border hover:bg-muted/50 transition-colors"
+                                                className="text-left text-sm px-3 py-2 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
                                             >
                                                 {q}
                                             </button>

@@ -75,7 +75,7 @@ describe('apiFetch route mapping', () => {
       const routeParams = matchRoute('/api/projects/:projectId', '/api/projects/project_xyz');
       const body = { name: 'Updated Name', description: 'Updated desc', goals: 'Updated goals', color: 'bg-red-500' };
       // Simulate extractParams for PUT
-      const params = { ...routeParams, params: { name: body.name, description: body.description, goals: body.goals, color: body.color } };
+      const params: { projectId: string; params: { name: string; description: string; goals: string; color: string } } = { projectId: routeParams!.projectId, params: { name: body.name, description: body.description, goals: body.goals, color: body.color } };
       expect(params.projectId).toBe('project_xyz');
       expect(params.params.name).toBe('Updated Name');
     });

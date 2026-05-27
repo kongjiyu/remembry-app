@@ -369,6 +369,239 @@ export interface MeetingWithKnowledge {
     default_language: string | null;
 }
 
+export interface FilteredProjectKnowledgeOverview {
+    allItems: ProjectKnowledgeItem[];
+    decisions: ProjectKnowledgeItem[];
+    actionItems: ProjectKnowledgeItem[];
+    questions: ProjectKnowledgeItem[];
+    missingEvents: Array<{
+        id: string;
+        title: string;
+        date: string;
+    }>;
+    allCount: number;
+    decisionsCount: number;
+    actionItemsCount: number;
+    questionsCount: number;
+    missingEventsCount: number;
+}
+
+export interface TimelineGroup {
+    dateLabel: string;
+    date: string;
+    items: ProjectKnowledgeItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Month Filtering
+// ---------------------------------------------------------------------------
+
+export interface MonthOption {
+    label: string;
+    value: string; // "all" | "YYYY-MM"
+}
+
+/**
+ * Derive a local YYYY-MM month key from a date string.
+ * Uses local date parts so the result matches what the UI displays via toLocaleDateString,
+ * avoiding disagreements near month boundaries where UTC date may differ from local display.
+ * Returns null for empty or invalid date strings.
+ */
+export function getProjectKnowledgeMonthKey(dateStr: string): string | null {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+/**
+ * Collect all available month options from project knowledge items and missing events.
+ * Months are sorted newest first. "All time" is always first.
+ * Invalid or missing dates are excluded from month options.
+ */
+export function getAvailableMonths(overview: ProjectKnowledgeOverview): MonthOption[] {
+    const monthSet = new Set<string>();
+
+    for (const item of overview.allItems) {
+        const monthKey = getProjectKnowledgeMonthKey(item.sourceEventDate);
+        if (monthKey) monthSet.add(monthKey);
+    }
+
+    for (const evt of overview.missingEvents) {
+        const monthKey = getProjectKnowledgeMonthKey(evt.date);
+        if (monthKey) monthSet.add(monthKey);
+    }
+
+    const sorted = Array.from(monthSet).sort((a, b) => b.localeCompare(a)); // newest first
+
+    const options: MonthOption[] = [{ label: "All time", value: "all" }];
+    for (const ym of sorted) {
+        const [year, month] = ym.split("-");
+        const d = new Date(Number(year), Number(month) - 1, 1);
+        options.push({
+            label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+            value: ym,
+        });
+    }
+
+    return options;
+}
+
+/**
+ * Filter a ProjectKnowledgeOverview by a selected month value ("all" or "YYYY-MM").
+ * "All time" preserves all items. For a specific month, only items with matching local YYYY-MM are included.
+ * Unknown-date items (empty/invalid) are only included under "all".
+ */
+export function filterProjectKnowledgeByMonth(
+    overview: ProjectKnowledgeOverview,
+    month: string
+): ProjectKnowledgeOverview {
+    if (month === "all") {
+        return overview;
+    }
+
+    function dateMatches(dateStr: string): boolean {
+        const monthKey = getProjectKnowledgeMonthKey(dateStr);
+        return monthKey !== null && monthKey === month;
+    }
+
+    const filteredDecisions = overview.decisions.filter(item => dateMatches(item.sourceEventDate));
+    const filteredActionItems = overview.actionItems.filter(item => dateMatches(item.sourceEventDate));
+    const filteredQuestions = overview.questions.filter(item => dateMatches(item.sourceEventDate));
+    const filteredAll = overview.allItems.filter(item => dateMatches(item.sourceEventDate));
+    const filteredMissing = overview.missingEvents.filter(evt => dateMatches(evt.date));
+
+    return {
+        allItems: filteredAll,
+        decisions: filteredDecisions,
+        actionItems: filteredActionItems,
+        questions: filteredQuestions,
+        decisionsCount: filteredDecisions.length,
+        actionItemsCount: filteredActionItems.length,
+        questionsCount: filteredQuestions.length,
+        missingEvents: filteredMissing,
+    };
+}
+
+/**
+ * Group project knowledge items by source event date, newest first.
+ * Invalid or missing dates are grouped under "Unknown date".
+ */
+export function groupProjectKnowledgeTimeline(items: ProjectKnowledgeItem[]): TimelineGroup[] {
+    const groups = new Map<string, TimelineGroup>();
+
+    for (const item of items) {
+        const dateStr = item.sourceEventDate;
+        let dateLabel: string;
+        let sortDate: string;
+
+        if (!dateStr) {
+            dateLabel = "Unknown date";
+            sortDate = "";
+        } else {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) {
+                dateLabel = "Unknown date";
+                sortDate = "";
+            } else {
+                dateLabel = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                sortDate = dateStr;
+            }
+        }
+
+        if (!groups.has(dateLabel)) {
+            groups.set(dateLabel, { dateLabel, date: sortDate, items: [] });
+        }
+        groups.get(dateLabel)!.items.push(item);
+    }
+
+    return Array.from(groups.values()).sort((a, b) => {
+        if (a.date === "" && b.date === "") return 0;
+        if (a.date === "") return 1;
+        if (b.date === "") return -1;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+}
+
+/**
+ * Filter project knowledge overview by a case-insensitive, trimmed search query.
+ * Matches against content, source event title, tags, item type label, assignee,
+ * due date, question status, and answer fields.
+ * Needs Extraction rows are matched against event title and formatted/raw date.
+ */
+export function filterProjectKnowledgeOverview(
+    overview: ProjectKnowledgeOverview,
+    query: string
+): FilteredProjectKnowledgeOverview {
+    const q = query.trim().toLowerCase();
+
+    if (!q) {
+        return {
+            allItems: overview.allItems,
+            decisions: overview.decisions,
+            actionItems: overview.actionItems,
+            questions: overview.questions,
+            missingEvents: overview.missingEvents,
+            allCount: overview.allItems.length,
+            decisionsCount: overview.decisionsCount,
+            actionItemsCount: overview.actionItemsCount,
+            questionsCount: overview.questionsCount,
+            missingEventsCount: overview.missingEvents.length,
+        };
+    }
+
+    function itemMatches(item: ProjectKnowledgeItem): boolean {
+        const searchable =
+            [
+                item.content,
+                item.sourceEventTitle,
+                ...item.tags,
+                item.itemType,
+                item.assignee ?? "",
+                item.dueDate ?? "",
+                item.questionStatus ?? "",
+                item.answer ?? "",
+            ]
+                .join(" ")
+                .toLowerCase();
+        return searchable.includes(q);
+    }
+
+    function needsExtractionMatches(evt: { id: string; title: string; date: string }): boolean {
+        const parsedDate = new Date(evt.date);
+        const formattedDate = isNaN(parsedDate.getTime())
+            ? ""
+            : parsedDate.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+              });
+        const searchable = [evt.title, evt.date, formattedDate].join(" ").toLowerCase();
+        return searchable.includes(q);
+    }
+
+    const filteredDecisions = overview.decisions.filter(itemMatches);
+    const filteredActionItems = overview.actionItems.filter(itemMatches);
+    const filteredQuestions = overview.questions.filter(itemMatches);
+    const filteredAll = overview.allItems.filter(itemMatches);
+    const filteredMissing = overview.missingEvents.filter(needsExtractionMatches);
+
+    return {
+        allItems: filteredAll,
+        decisions: filteredDecisions,
+        actionItems: filteredActionItems,
+        questions: filteredQuestions,
+        missingEvents: filteredMissing,
+        allCount: filteredAll.length,
+        decisionsCount: filteredDecisions.length,
+        actionItemsCount: filteredActionItems.length,
+        questionsCount: filteredQuestions.length,
+        missingEventsCount: filteredMissing.length,
+    };
+}
+
 /**
  * Aggregate knowledge from all meetings in a project using 'en' or 'default'.
  * Falls back to 'default' when 'en' is absent.

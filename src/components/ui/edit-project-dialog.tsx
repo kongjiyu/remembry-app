@@ -146,7 +146,7 @@ export function EditProjectDialog({ open, onOpenChange, project, onSuccess }: Ed
                     key={opt.value}
                     type="button"
                     onClick={() => setColor(opt.value)}
-                    className={`size-8 rounded-full ${opt.value} transition-all ${
+                    className={`size-8 rounded-full ${opt.value} transition-all cursor-pointer ${
                       color === opt.value ? "ring-2 ring-offset-2 ring-foreground scale-110" : "opacity-60 hover:opacity-100"
                     }`}
                     title={opt.label}

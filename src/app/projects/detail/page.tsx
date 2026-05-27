@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,7 @@ import {
     ListTodo,
     HelpCircle,
     Sparkles,
+    Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
@@ -31,6 +32,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatMimeBadgeLabel } from "@/lib/meetingViews";
 import {
     aggregateProjectKnowledge,
+    filterProjectKnowledgeOverview,
+    groupProjectKnowledgeTimeline,
+    filterProjectKnowledgeByMonth,
+    getAvailableMonths,
     MeetingWithKnowledge,
     ProjectKnowledgeOverview,
     ProjectKnowledgeItem,
@@ -90,26 +95,28 @@ function KnowledgeRow({ item, project }: { item: ProjectKnowledgeItem; project: 
     const eventUrl = `/events/detail?id=${encodeURIComponent(item.sourceEventId)}&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`;
 
     const icon = item.itemType === 'decision'
-        ? <Gavel className="size-4 text-orange-500 shrink-0 mt-0.5" />
+        ? <Gavel className="size-5 text-orange-500 dark:text-orange-400" />
         : item.itemType === 'action_item'
-        ? <ListTodo className="size-4 text-green-500 shrink-0 mt-0.5" />
-        : <HelpCircle className="size-4 text-purple-500 shrink-0 mt-0.5" />;
+        ? <ListTodo className="size-5 text-green-500 dark:text-green-400" />
+        : <HelpCircle className="size-5 text-purple-500 dark:text-purple-400" />;
 
     const typeBadge = item.itemType === 'decision'
-        ? <Badge variant="outline" className="text-xs text-orange-600 border-orange-200">Decision</Badge>
+        ? <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50/50 dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-300">Decision</Badge>
         : item.itemType === 'action_item'
-        ? <Badge variant="outline" className="text-xs text-green-600 border-green-200">Action Item</Badge>
-        : <Badge variant="outline" className="text-xs text-purple-600 border-purple-200">Question</Badge>;
+        ? <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50/50 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-300">Action Item</Badge>
+        : <Badge variant="outline" className="text-xs text-purple-600 border-purple-200 bg-purple-50/50 dark:bg-purple-500/10 dark:border-purple-500/30 dark:text-purple-300">Question</Badge>;
 
     return (
         <Link
             href={eventUrl}
-            className="flex gap-3 px-4 py-3 rounded-lg border hover:bg-muted/50 transition-colors items-start group"
+            className="flex gap-3 p-4 rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/30 transition-all items-start group"
         >
-            {icon}
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                {icon}
+            </div>
             <div className="flex-1 min-w-0 break-words whitespace-normal">
-                <p className="text-sm leading-relaxed">{item.content}</p>
-                <div className="flex flex-wrap gap-1.5 items-center mt-1.5">
+                <p className="text-sm leading-relaxed font-medium">{item.content}</p>
+                <div className="flex flex-wrap gap-1.5 items-center mt-2">
                     {typeBadge}
                     {item.itemType === 'action_item' && item.assignee && (
                         <Badge variant="outline" className="text-xs">Assignee: {item.assignee}</Badge>
@@ -152,8 +159,24 @@ function ProjectDetailContent() {
     const [showDeleteMeetingDialog, setShowDeleteMeetingDialog] = useState(false);
     const [isDeletingMeeting, setIsDeletingMeeting] = useState(false);
     const [projectOverview, setProjectOverview] = useState<ProjectKnowledgeOverview | null>(null);
+    const [overviewSearchQuery, setOverviewSearchQuery] = useState("");
+    const [selectedOverviewMonth, setSelectedOverviewMonth] = useState("all");
     const [expandedTabs, setExpandedTabs] = useState<Record<string, boolean>>({});
     const [showEditDialog, setShowEditDialog] = useState(false);
+
+    const availableMonths = useMemo(() => projectOverview ? getAvailableMonths(projectOverview) : [], [projectOverview]);
+    const availableMonthValues = useMemo(() => new Set(availableMonths.map(o => o.value)), [availableMonths]);
+    const effectiveOverviewMonth = availableMonthValues.has(selectedOverviewMonth) ? selectedOverviewMonth : "all";
+    const monthFilteredOverview = projectOverview ? filterProjectKnowledgeByMonth(projectOverview, effectiveOverviewMonth) : null;
+    const displayedOverview = monthFilteredOverview ? filterProjectKnowledgeOverview(monthFilteredOverview, overviewSearchQuery) : null;
+    const isOverviewSearching = overviewSearchQuery.trim().length > 0;
+
+    // Sync stale month state back to "all" so the <select> value stays consistent
+    useEffect(() => {
+        if (!availableMonthValues.has(selectedOverviewMonth)) {
+            setSelectedOverviewMonth("all");
+        }
+    }, [availableMonthValues, selectedOverviewMonth]);
 
     const toggleExpanded = (tab: string) => {
         setExpandedTabs(prev => ({ ...prev, [tab]: !prev[tab] }));
@@ -213,6 +236,14 @@ function ProjectDetailContent() {
 
         loadProject();
         return () => { cancelled = true; };
+    }, [projectName]);
+
+    // Reset filters when switching projects
+    useEffect(() => {
+        setOverviewSearchQuery("");
+        setSelectedOverviewMonth("all");
+        setExpandedTabs({});
+        setSearchQuery("");
     }, [projectName]);
 
     const filteredEvents = (project?.meetings || []).filter(meeting =>
@@ -416,16 +447,16 @@ function ProjectDetailContent() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground">
-                                RAG Store
+                                Extracted Knowledge
                             </CardTitle>
-                            <FileText className="size-4 text-muted-foreground" />
+                            <Sparkles className="size-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-sm font-mono truncate">
-                                {project.id.split('/').pop()}
+                            <div className="text-3xl font-bold">
+                                {projectOverview?.allItems.length ?? 0}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
-                                Store identifier
+                                Items available across events
                             </p>
                         </CardContent>
                     </Card>
@@ -454,52 +485,97 @@ function ProjectDetailContent() {
                 )}
                 {projectOverview && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                             <h2 className="text-xl font-semibold">Project Overview</h2>
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search overview..."
+                                        className="pl-9 max-w-xs h-8 text-sm"
+                                        value={overviewSearchQuery}
+                                        onChange={(e) => setOverviewSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                <select
+                                    className="h-8 px-2 pr-6 text-sm border border-input bg-background text-foreground rounded-md cursor-pointer"
+                                    value={selectedOverviewMonth}
+                                    onChange={(e) => setSelectedOverviewMonth(e.target.value)}
+                                    aria-label="Filter overview by month"
+                                >
+                                    {availableMonths.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                        <Tabs defaultValue="all" className="w-full">
-                            <TabsList className="w-fit max-w-full justify-start bg-transparent gap-1 p-0">
-                                <TabsTrigger value="all" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
+                        {displayedOverview && (
+                        <Tabs defaultValue="timeline" className="w-full">
+                            <TabsList className="h-auto w-full max-w-full flex flex-wrap justify-start gap-2 bg-transparent p-0">
+                                <TabsTrigger value="timeline" className="h-9 flex-none px-3 whitespace-nowrap gap-1.5 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+                                    <Clock className="size-4" />
+                                    Timeline
+                                </TabsTrigger>
+                                <TabsTrigger value="all" className="h-9 flex-none px-3 whitespace-nowrap gap-1.5 data-[state=active]:bg-muted data-[state=active]:text-foreground">
                                     All
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.allItems.length}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.allCount}</Badge>
                                 </TabsTrigger>
-                                <TabsTrigger value="decisions" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
-                                    <Gavel className="size-4 text-orange-500" />
+                                <TabsTrigger value="decisions" className="h-9 flex-none px-3 whitespace-nowrap gap-1.5 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+                                    <Gavel className="size-4 text-orange-500 dark:text-orange-400" />
                                     Decisions
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.decisionsCount}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.decisionsCount}</Badge>
                                 </TabsTrigger>
-                                <TabsTrigger value="action_items" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
-                                    <ListTodo className="size-4 text-green-500" />
+                                <TabsTrigger value="action_items" className="h-9 flex-none px-3 whitespace-nowrap gap-1.5 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+                                    <ListTodo className="size-4 text-green-500 dark:text-green-400" />
                                     Action Items
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.actionItemsCount}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.actionItemsCount}</Badge>
                                 </TabsTrigger>
-                                <TabsTrigger value="questions" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
-                                    <HelpCircle className="size-4 text-purple-500" />
+                                <TabsTrigger value="questions" className="h-9 flex-none px-3 whitespace-nowrap gap-1.5 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+                                    <HelpCircle className="size-4 text-purple-500 dark:text-purple-400" />
                                     Questions
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.questionsCount}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.questionsCount}</Badge>
                                 </TabsTrigger>
-                                <TabsTrigger value="needs_extraction" className="h-8 flex-none px-3 whitespace-nowrap gap-1.5">
+                                <TabsTrigger value="needs_extraction" className="h-9 flex-none px-3 whitespace-nowrap gap-1.5 data-[state=active]:bg-muted data-[state=active]:text-foreground">
                                     <Sparkles className="size-4 text-muted-foreground" />
                                     Needs Extraction
-                                    <Badge variant="secondary" className="text-xs">{projectOverview.missingEvents.length}</Badge>
+                                    <Badge variant="secondary" className="text-xs">{displayedOverview.missingEventsCount}</Badge>
                                 </TabsTrigger>
                             </TabsList>
 
+                            <TabsContent value="timeline" className="mt-4">
+                                {displayedOverview.allItems.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No knowledge timeline yet."}</p>
+                                ) : (
+                                    <div className="space-y-6">
+                                        {groupProjectKnowledgeTimeline(displayedOverview.allItems).map((group) => (
+                                            <div key={group.dateLabel}>
+                                                <h3 className="text-sm font-medium text-muted-foreground mb-2">{group.dateLabel}</h3>
+                                                <div className="space-y-2">
+                                                    {group.items.map((item, i) => (
+                                                        <KnowledgeRow key={i} item={item} project={project} />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </TabsContent>
+
                             <TabsContent value="all" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.allItems.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No knowledge extracted yet.</p>
+                                    {displayedOverview.allItems.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No knowledge extracted yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["all"] ? projectOverview.allItems : projectOverview.allItems.slice(0, 4)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["all"] ? displayedOverview.allItems : displayedOverview.allItems.slice(0, 4)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.allItems.length > 4 && (
+                                            {!isOverviewSearching && displayedOverview.allItems.length > 4 && (
                                                 <button
                                                     onClick={() => toggleExpanded("all")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["all"] ? "Show fewer" : `Show all ${projectOverview.allItems.length}`}
+                                                    {expandedTabs["all"] ? "Show fewer" : `Show all ${displayedOverview.allItems.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -509,19 +585,19 @@ function ProjectDetailContent() {
 
                             <TabsContent value="decisions" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.decisions.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No decisions yet.</p>
+                                    {displayedOverview.decisions.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No decisions yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["decisions"] ? projectOverview.decisions : projectOverview.decisions.slice(0, 3)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["decisions"] ? displayedOverview.decisions : displayedOverview.decisions.slice(0, 3)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.decisions.length > 3 && (
+                                            {!isOverviewSearching && displayedOverview.decisions.length > 3 && (
                                                 <button
                                                     onClick={() => toggleExpanded("decisions")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["decisions"] ? "Show fewer" : `Show all ${projectOverview.decisions.length}`}
+                                                    {expandedTabs["decisions"] ? "Show fewer" : `Show all ${displayedOverview.decisions.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -531,19 +607,19 @@ function ProjectDetailContent() {
 
                             <TabsContent value="action_items" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.actionItems.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No action items yet.</p>
+                                    {displayedOverview.actionItems.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No action items yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["action_items"] ? projectOverview.actionItems : projectOverview.actionItems.slice(0, 3)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["action_items"] ? displayedOverview.actionItems : displayedOverview.actionItems.slice(0, 3)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.actionItems.length > 3 && (
+                                            {!isOverviewSearching && displayedOverview.actionItems.length > 3 && (
                                                 <button
                                                     onClick={() => toggleExpanded("action_items")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["action_items"] ? "Show fewer" : `Show all ${projectOverview.actionItems.length}`}
+                                                    {expandedTabs["action_items"] ? "Show fewer" : `Show all ${displayedOverview.actionItems.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -553,19 +629,19 @@ function ProjectDetailContent() {
 
                             <TabsContent value="questions" className="mt-4">
                                 <div className="space-y-2">
-                                    {projectOverview.questions.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">No questions yet.</p>
+                                    {displayedOverview.questions.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "No questions yet."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["questions"] ? projectOverview.questions : projectOverview.questions.slice(0, 3)).map((item, i) => (
+                                            {(isOverviewSearching || expandedTabs["questions"] ? displayedOverview.questions : displayedOverview.questions.slice(0, 3)).map((item, i) => (
                                                 <KnowledgeRow key={i} item={item} project={project} />
                                             ))}
-                                            {projectOverview.questions.length > 3 && (
+                                            {!isOverviewSearching && displayedOverview.questions.length > 3 && (
                                                 <button
                                                     onClick={() => toggleExpanded("questions")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["questions"] ? "Show fewer" : `Show all ${projectOverview.questions.length}`}
+                                                    {expandedTabs["questions"] ? "Show fewer" : `Show all ${displayedOverview.questions.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -575,11 +651,11 @@ function ProjectDetailContent() {
 
                             <TabsContent value="needs_extraction" className="mt-4">
                                 <div className="flex flex-wrap gap-2">
-                                    {projectOverview.missingEvents.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-8 text-center">All events have knowledge extracted.</p>
+                                    {displayedOverview.missingEvents.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-8 text-center">{isOverviewSearching ? "No overview results found." : "All events have knowledge extracted."}</p>
                                     ) : (
                                         <>
-                                            {(expandedTabs["needs_extraction"] ? projectOverview.missingEvents : projectOverview.missingEvents.slice(0, 6)).map((evt) => {
+                                            {(isOverviewSearching || expandedTabs["needs_extraction"] ? displayedOverview.missingEvents : displayedOverview.missingEvents.slice(0, 6)).map((evt) => {
                                                 const meetingUrl = `/events/detail?id=${encodeURIComponent(evt.id)}&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`;
                                                 return (
                                                     <Link
@@ -593,12 +669,12 @@ function ProjectDetailContent() {
                                                     </Link>
                                                 );
                                             })}
-                                            {projectOverview.missingEvents.length > 6 && (
+                                            {!isOverviewSearching && displayedOverview.missingEvents.length > 6 && (
                                                 <button
                                                     onClick={() => toggleExpanded("needs_extraction")}
-                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1 px-2"
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-2"
                                                 >
-                                                    {expandedTabs["needs_extraction"] ? "Show fewer" : `Show all ${projectOverview.missingEvents.length}`}
+                                                    {expandedTabs["needs_extraction"] ? "Show fewer" : `Show all ${displayedOverview.missingEvents.length}`}
                                                 </button>
                                             )}
                                         </>
@@ -606,6 +682,7 @@ function ProjectDetailContent() {
                                 </div>
                             </TabsContent>
                         </Tabs>
+                        )}
                     </div>
                 )}
 
