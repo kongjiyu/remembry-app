@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start style-a.html)",
+      "Bash(start style-b.html)",
+      "Bash(start style-c.html)",
+      "Bash(start REMEMBRY_PRESENTATION.html)",
+      "mcp__MiniMax__understand_image",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(start *)"
+    ]
+  }
+}
