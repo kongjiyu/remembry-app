@@ -570,11 +570,14 @@ export function filterProjectKnowledgeOverview(
     }
 
     function needsExtractionMatches(evt: { id: string; title: string; date: string }): boolean {
-        const formattedDate = new Date(evt.date).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        });
+        const parsedDate = new Date(evt.date);
+        const formattedDate = isNaN(parsedDate.getTime())
+            ? ""
+            : parsedDate.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+              });
         const searchable = [evt.title, evt.date, formattedDate].join(" ").toLowerCase();
         return searchable.includes(q);
     }
