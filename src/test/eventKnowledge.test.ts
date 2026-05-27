@@ -6,9 +6,12 @@ import {
     getAvailableMonths,
     filterProjectKnowledgeByMonth,
     getProjectKnowledgeMonthKey,
+    subtypeLabel,
+    groupObservationsWithContent,
     type ProjectKnowledgeOverview,
     type ProjectKnowledgeItem,
     type MeetingWithKnowledge,
+    type KnowledgeItem,
 } from "@/lib/eventKnowledge";
 
 /** Snake_case API question item shape — used for raw test fixtures before normalization */
@@ -578,5 +581,80 @@ describe("filterProjectKnowledgeByMonth", () => {
         const result = filterProjectKnowledgeByMonth(overview, localMonth);
 
         expect(result.missingEvents.length).toBe(1);
+    });
+});
+
+describe("subtypeLabel", () => {
+    it("converts student_difficulty to Student Difficulty", () => {
+        expect(subtypeLabel("student_difficulty")).toBe("Student Difficulty");
+    });
+
+    it("converts balancing_issue to Balancing Issue", () => {
+        expect(subtypeLabel("balancing_issue")).toBe("Balancing Issue");
+    });
+
+    it("returns General for undefined", () => {
+        expect(subtypeLabel(undefined)).toBe("General");
+    });
+
+    it("returns General for empty string", () => {
+        expect(subtypeLabel("")).toBe("General");
+    });
+
+    it("converts multi-word snake_case", () => {
+        expect(subtypeLabel("some_multi_word_type")).toBe("Some Multi Word Type");
+    });
+});
+
+describe("groupObservationsWithContent", () => {
+    const makeObs = (id: string, subtype: string | undefined, content: string): KnowledgeItem =>
+        ({ id, item_type: "observation", subtype, content, evidence: [], tags: [] });
+
+    it("filters out observations with empty content", () => {
+        const obs = [
+            makeObs("1", "student_difficulty", "Students struggled"),
+            makeObs("2", "student_difficulty", ""),
+        ];
+        const result = groupObservationsWithContent(obs);
+        expect(result[0].items.length).toBe(1);
+        expect(result[0].items[0].id).toBe("1");
+    });
+
+    it("groups multiple observations under the same subtype", () => {
+        const obs = [
+            makeObs("1", "student_difficulty", "Students struggled with algebra"),
+            makeObs("2", "student_difficulty", "Confusion on fractions"),
+        ];
+        const result = groupObservationsWithContent(obs);
+        expect(result.length).toBe(1);
+        expect(result[0].label).toBe("Student Difficulty");
+        expect(result[0].items.length).toBe(2);
+    });
+
+    it("sorts general to last", () => {
+        const obs = [
+            makeObs("1", "general", "General note"),
+            makeObs("2", "student_difficulty", "Student note"),
+        ];
+        const result = groupObservationsWithContent(obs);
+        expect(result[0].label).toBe("Student Difficulty");
+        expect(result[1].label).toBe("General");
+    });
+
+    it("returns empty array when all observations have empty content", () => {
+        const obs = [
+            makeObs("1", "student_difficulty", ""),
+        ];
+        const result = groupObservationsWithContent(obs);
+        expect(result.length).toBe(0);
+    });
+
+    it("treats missing subtype as general", () => {
+        const obs = [
+            makeObs("1", undefined, "No subtype"),
+        ];
+        const result = groupObservationsWithContent(obs);
+        expect(result.length).toBe(1);
+        expect(result[0].label).toBe("General");
     });
 });
