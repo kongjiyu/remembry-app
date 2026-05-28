@@ -75,8 +75,42 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Clear icon cache
+        run: |
+          rm -rf src-tauri/icons
+          rm -rf ~/Library/Caches/cargo-tauri/icons 2>/dev/null || true
+
       - name: Build Tauri (DMG)
         run: npm run tauri:build
+
+      - name: Find and codesign the app bundle
+        id: find-app
+        run: |
+          APP_PATH=$(find src-tauri/target/release/bundle -name "*.app" -type d 2>/dev/null | head -1)
+          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "Found app at: $APP_PATH"
+
+      - name: Ad-hoc sign the app bundle
+        if: steps.find-app.outputs.app_path != ''
+        run: |
+          if [ -n "{{ steps.find-app.outputs.app_path }}" ]; then
+            echo "Ad-hoc signing: {{ steps.find-app.outputs.app_path }}"
+            codesign -s - --force --deep --preserve=identifier -f "{{ steps.find-app.outputs.app_path }}"
+          fi
+
+      - name: Rebuild DMG with signed app
+        if: steps.find-app.outputs.app_path != ''
+        run: |
+          APP_DIR=$(dirname "{{ steps.find-app.outputs.app_path }}")
+          create-dmg \
+            --identifier "com.remembry.app" \
+            --overwrite \
+            --output "$APP_DIR" \
+            "{{ steps.find-app.outputs.app_path }}"
+
+      - name: Strip quarantine from DMG
+        run: |
+          find src-tauri/target/release/bundle -name "*.dmg" -exec xattr -cr {} \;
 
       - name: List bundle output
         run: |
