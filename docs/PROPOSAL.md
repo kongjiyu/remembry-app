@@ -26,9 +26,55 @@ This creates a growing need for a privacy-first platform capable of transforming
 
 ---
 
-# 2. Proposed Solution
+# 2. Stakeholder / Persona
 
-## 2.1 Overview
+## 2.1 Primary Stakeholders
+
+Remembry is built for SME decision-makers — founders, COOs, and operations leaders who are responsible for meeting outcomes, organizational continuity, budgeting, and risk management.
+
+Secondary stakeholders include team leads who run cross-functional meetings and deal with lost decisions, repeated discussions, and fragmented documentation.
+
+## 2.2 Key Challenges
+
+These stakeholders commonly face:
+
+* Critical decisions lost after meetings
+* Knowledge scattered across chat, documents, and recordings
+* Employee turnover disrupting continuity and onboarding
+* Privacy and compliance concerns with cloud-first AI tools
+* Subscription fatigue across multiple SaaS systems
+
+## 2.3 What Success Looks Like
+
+Decision-makers look for solutions that deliver:
+
+* **Trust** — full data ownership with local storage
+* **Speed** — rapid retrieval of decisions and context
+* **Cost control** — no per-seat subscription lock-in
+* **Easy adoption** — lightweight setup and minimal IT overhead
+
+## 2.4 Common Buying Triggers
+
+Adoption is most likely when:
+
+* Key employees leave and knowledge gaps appear
+* Compliance or confidentiality concerns rise
+* Meeting volume increases during growth
+* Leadership wants measurable productivity improvements
+
+## 2.5 Common Objections
+
+Typical pre-purchase questions include:
+
+* Will the AI be accurate enough for real decisions?
+* Is it truly private if AI is involved?
+* Can it fit our workflow without disruption?
+
+---
+
+# 3. Proposed Solution
+
+## 3.1 Overview
 
 Remembry is a privacy-first desktop application designed to transform meeting recordings into structured, searchable, and long-term organizational knowledge using multi-modal AI technologies.
 
@@ -50,7 +96,7 @@ Users may also utilize their own Gemini API keys, reducing vendor lock-in and mi
 
 ---
 
-## 2.2 Core Features
+## 3.2 Core Features
 
 ### Privacy-First Local Architecture
 
@@ -118,11 +164,51 @@ Future versions may automatically generate continuity summaries and handover rep
 
 ---
 
-# 3. Competitor Analysis
+# 4. Target Market
+
+## 4.1 Ideal Customer Profile
+
+Remembry targets SMEs (roughly 10–200 employees) that rely heavily on meetings and collaborative decisions, especially teams handling sensitive or regulated information.
+
+## 4.2 Best-Fit Industries
+
+Strongest fit includes:
+
+* Professional services
+* Agencies
+* SaaS startups
+* Consulting firms
+* Legal operations
+* Healthcare administration
+* Financial operations
+
+## 4.3 Core Job-To-Be-Done
+
+Turn meetings into durable, searchable organizational memory.
+
+## 4.4 Behavioral Signals
+
+Ideal customers often:
+
+* Depend on manual note-taking and messy recordings
+* Use multiple disconnected tools with no unified memory system
+* Avoid cloud transcription due to confidentiality concerns
+
+## 4.5 Compliance and Geographic Fit
+
+The product is especially attractive where GDPR, HIPAA, or data residency constraints apply.
+
+## 4.6 Expansion Opportunity
+
+Adoption typically progresses from a single team to multi-team workspaces as trust and usage grow.
+
+---
+
+# 5. Competitor Analysis
 
 Current AI meeting assistant tools are mostly positioned around transcription, meeting summaries, and cloud-based collaboration. Remembry takes a different position: it focuses on privacy-first storage, low adoption cost, and long-term organizational memory for SMEs.
 
-## 3.1 Feature Comparison
+## 5.1 Feature Comparison
 
 | Dimension              | Remembry                                                      | Otter.ai                               | Fireflies.ai                           | CAST                          |
 | ---------------------- | ------------------------------------------------------------- | -------------------------------------- | -------------------------------------- | ----------------------------- |
@@ -138,7 +224,7 @@ Current AI meeting assistant tools are mostly positioned around transcription, m
 
 ---
 
-## 3.2 Measurable Productivity and Operational Metrics
+## 5.2 Measurable Productivity and Operational Metrics
 
 To strengthen practical business value, Remembry focuses on measurable operational improvements instead of only AI convenience.
 
@@ -157,7 +243,7 @@ The following metrics demonstrate how the platform may improve productivity and 
 
 ---
 
-## 3.3 Example SME Productivity Impact
+## 5.3 Example SME Productivity Impact
 
 Assume an SME team conducts:
 
@@ -191,7 +277,7 @@ The larger impact comes from reducing operational friction, minimizing knowledge
 
 ---
 
-## 3.4 Competitive Positioning Summary
+## 5.4 Competitive Positioning Summary
 
 Assume a small SME team has 10 users who need AI meeting notes.
 
@@ -214,7 +300,252 @@ Remembry's competitive positioning can be summarized as:
 
 ---
 
-# 4. Scalability and Future Roadmap
+# 6. Business Model
+
+## 6.1 Core Model
+
+* $0 platform fee
+* Customers bring their own Gemini API key
+* AI usage costs remain fully under customer control
+
+This removes vendor lock-in while keeping adoption low-friction for SMEs.
+
+## 6.2 Core Differentiation
+
+* Local-first storage
+* Structured knowledge extraction
+* Long-term organizational memory, not just transcription
+
+## 6.3 Pricing Advantages
+
+* No per-seat subscription cost creep
+* Costs scale with actual usage
+* Direct control over AI spending
+
+## 6.4 Future Monetization Paths
+
+Potential expansions include:
+
+* Team workspace management
+* Advanced admin and permission controls
+* On-prem enterprise packages
+* Premium analytics and knowledge graph features
+* Paid integrations (Notion, Confluence, etc.)
+
+## 6.5 Retention Drivers
+
+The product becomes more valuable over time as organizational knowledge accumulates and searchability improves.
+
+---
+
+# 7. Go-to-Market Strategy
+
+## 7.1 Positioning
+
+The product is positioned as a **privacy-first organizational memory platform for SMEs**, rather than simply another AI meeting transcription tool.
+
+Most existing meeting tools focus mainly on converting speech into text. While transcription is useful, it does not solve the larger business problem: organizations continuously lose decisions, context, and institutional knowledge after meetings end.
+
+This platform focuses on helping SMEs preserve and retrieve organizational knowledge in a structured and searchable way. Instead of creating another collection of recordings and transcripts, the system transforms meetings into reusable business intelligence, including summaries, decisions, action items, and contextual Q&A.
+
+The positioning emphasizes three core differentiators:
+
+* **Privacy-first architecture** through local storage and customer-controlled AI usage
+* **Organizational memory** instead of simple transcription
+* **SME-focused simplicity** with low adoption friction and transparent cost structure
+
+The key positioning statement is:
+
+> “Privacy-first organizational memory for SMEs — not just another meeting note app.”
+
+This messaging is designed to resonate strongly with founders, operations leaders, and privacy-conscious organizations that are dissatisfied with cloud-dependent AI meeting platforms.
+
+---
+
+## 7.2 Entry Wedge
+
+The primary market entry strategy combines two highly attractive adoption drivers for SMEs:
+
+### Privacy-First Local Storage
+
+Many SMEs are increasingly concerned about uploading confidential discussions, client conversations, financial information, or internal operational data to third-party cloud services.
+
+The platform addresses this concern directly by using a local-first architecture, where meeting data and organizational knowledge remain under the customer’s control instead of being permanently stored on external servers.
+
+This creates a strong trust advantage, especially for businesses operating in regulated or confidentiality-sensitive industries.
+
+### Cost Control Through BYO API Key
+
+Traditional AI SaaS products often introduce unpredictable subscription costs, seat-based pricing, or premium feature paywalls as usage grows.
+
+Instead, the platform adopts a Bring-Your-Own (BYO) Gemini API key model, allowing customers to:
+
+* Control their own AI usage costs
+* Avoid expensive per-user subscription scaling
+* Maintain transparency over operational expenses
+* Reduce long-term vendor lock-in concerns
+
+This pricing model lowers the barrier to adoption because businesses can start using the platform without committing to another recurring enterprise subscription.
+
+Together, privacy and cost control create a highly effective entry wedge into the SME market.
+
+---
+
+## 7.3 Acquisition Channels
+
+The go-to-market approach focuses on highly targeted, relationship-driven acquisition channels rather than expensive mass-market advertising.
+
+### Direct Demos to SME Decision-Makers
+
+The primary acquisition channel is direct product demonstrations to founders, COOs, and operations managers.
+
+Because the product solves workflow and organizational continuity problems, live demonstrations are highly effective at showing immediate value. Decision-makers can quickly understand how the platform captures meeting knowledge, retrieves past decisions, and improves operational continuity.
+
+Demo-led selling also helps overcome skepticism around AI accuracy and workflow integration.
+
+### Founder-Led Outreach
+
+Early-stage growth relies heavily on founder-led outreach into operations and business leadership communities.
+
+This includes engaging with:
+
+* COO communities
+* Operations-focused forums
+* SME business groups
+* Startup founder networks
+* LinkedIn operational leadership circles
+
+Founder-led communication helps establish trust and credibility, especially when discussing privacy, operational efficiency, and knowledge management challenges.
+
+### Product-Led Adoption
+
+To reduce adoption friction, the product includes a lightweight onboarding experience with a free entry point.
+
+Potential users can quickly test the platform without long procurement cycles or complicated enterprise onboarding. This allows SMEs to experience value rapidly before wider organizational adoption.
+
+The onboarding experience is intentionally designed to require minimal technical expertise.
+
+---
+
+## 7.4 Messaging Themes
+
+The marketing and communication strategy revolves around operational pain points that SME leaders already experience daily.
+
+### “Stop Losing Decisions”
+
+Many organizations repeatedly revisit discussions because important decisions become buried inside recordings, chat tools, or scattered notes.
+
+This message highlights the cost of poor organizational memory and positions the platform as a solution for preserving operational continuity.
+
+### “Own Your Data, Keep It Local”
+
+Privacy concerns are becoming increasingly important as businesses adopt AI-powered workflows.
+
+This message reinforces the platform’s local-first architecture and customer-controlled data ownership model, helping differentiate it from cloud-dependent competitors.
+
+### “Searchable Memory, Not Just Transcripts”
+
+This message emphasizes that the platform is not merely converting audio into text.
+
+Instead, it transforms meetings into structured, searchable organizational knowledge that teams can retrieve and reuse over time.
+
+This distinction is critical because it shifts the conversation from “meeting recording” toward “business intelligence and continuity.”
+
+---
+
+## 7.5 Proof Points
+
+The platform’s value proposition is supported by several measurable operational improvements.
+
+### Faster Decision Retrieval
+
+Teams can retrieve past discussions, decisions, and action items within seconds instead of manually searching through recordings, notes, or chat histories.
+
+This reduces wasted time and improves operational efficiency.
+
+### Fewer Repeated Meetings
+
+Organizations often repeat conversations because prior decisions are difficult to locate or poorly documented.
+
+By creating structured organizational memory, the platform reduces duplicated discussions and improves alignment across teams.
+
+### Improved Compliance and Privacy Posture
+
+Because the system is designed around local-first storage and customer-controlled AI usage, businesses can reduce concerns around sensitive cloud data exposure.
+
+This is particularly valuable for organizations operating under confidentiality requirements or regulatory frameworks.
+
+### Lower Total Cost
+
+Compared to subscription-based AI meeting tools, the BYO API model provides more transparent and scalable cost management.
+
+Businesses avoid paying increasing seat-based fees as teams grow, making the platform financially attractive for SMEs with expanding operations.
+
+---
+
+## 7.6 Adoption Flow
+
+The onboarding experience is intentionally simple to minimize technical friction and accelerate time-to-value.
+
+### Step 1: Install the Desktop Application
+
+Users begin by installing the desktop application locally within their working environment.
+
+The setup process is lightweight and does not require complex infrastructure deployment.
+
+### Step 2: Add Gemini API Key
+
+Users connect their own Gemini API key to enable AI processing capabilities.
+
+This gives customers direct ownership and visibility over AI usage and costs.
+
+### Step 3: Upload or Record Meetings
+
+Teams can either upload existing meeting recordings or record meetings directly through the platform.
+
+The system then processes the content automatically.
+
+### Step 4: Receive Structured Organizational Knowledge
+
+Instead of generating only raw transcripts, the platform produces:
+
+* Meeting summaries
+* Key decisions
+* Action items
+* Contextual Q&A
+* Searchable organizational memory
+
+Users can immediately search and retrieve knowledge from past meetings, creating instant operational value.
+
+---
+
+## 7.7 Early Partnerships
+
+Early growth partnerships focus on ecosystems where SME decision-makers already gather and collaborate.
+
+### SME Accelerators
+
+Partnerships with SME and startup accelerators provide direct access to growing companies that already experience scaling and operational continuity challenges.
+
+### Co-Working Communities
+
+Co-working spaces often contain startups, agencies, and small operations-heavy businesses that rely heavily on meetings and collaboration.
+
+These communities provide strong early adoption opportunities.
+
+### Local Business Networks
+
+Regional SME business associations and networking communities offer access to privacy-conscious business owners seeking operational improvements.
+
+### Founder and Operations Communities
+
+Operations leaders and founders are highly aligned with the product’s value proposition because they directly experience the cost of lost organizational knowledge.
+
+Building visibility within these communities helps create trust-driven organic adoption and referrals.
+
+---
+
+# 8. Scalability and Future Roadmap
 
 ## Phase 1 — MVP Foundation
 
@@ -309,7 +640,7 @@ As future LLMs become more context-aware and reliable, the platform may provide:
 
 ---
 
-## 4.5 Scalability Metrics for Future Evaluation
+## 8.5 Scalability Metrics for Future Evaluation
 
 As the platform evolves, scalability can be measured through operational and productivity-focused indicators.
 
@@ -328,9 +659,9 @@ These metrics position Remembry as intelligent business memory infrastructure ra
 
 ---
 
-# 5. Why Now?
+# 9. Why Now?
 
-## 5.1 Multi-Modal AI Has Reached Practical Maturity
+## 9.1 Multi-Modal AI Has Reached Practical Maturity
 
 Recent advancements in multi-modal AI models such as Gemini, GPT-4o, and Whisper have significantly reduced the cost and complexity of transcription and semantic extraction.
 
@@ -346,7 +677,7 @@ This creates an opportunity for SMEs to adopt AI-powered knowledge systems witho
 
 ---
 
-## 5.2 Privacy-First AI Is Becoming Increasingly Important
+## 9.2 Privacy-First AI Is Becoming Increasingly Important
 
 Organizations are becoming increasingly cautious about uploading confidential operational discussions to third-party cloud platforms.
 
@@ -363,7 +694,7 @@ Remembry aligns directly with this industry shift by prioritizing local storage 
 
 ---
 
-## 5.3 Organizational Knowledge Loss Is Increasing
+## 9.3 Organizational Knowledge Loss Is Increasing
 
 As businesses become increasingly meeting-intensive and collaborative, organizational knowledge is becoming fragmented across recordings, documents, messaging platforms, and employee memory.
 
@@ -378,7 +709,7 @@ Remembry addresses this issue by preserving discussions as structured and search
 
 ---
 
-## 5.4 Current Market Solutions Remain Incomplete
+## 9.4 Current Market Solutions Remain Incomplete
 
 Most existing AI meeting platforms primarily focus on:
 
@@ -398,7 +729,7 @@ This creates a strategic opportunity for Remembry to establish itself within a r
 
 ---
 
-# 6. Conclusion
+# 10. Conclusion
 
 Remembry proposes a privacy-first organizational memory platform that leverages multi-modal AI technologies to help SMEs preserve, retrieve, and utilize business knowledge more effectively.
 

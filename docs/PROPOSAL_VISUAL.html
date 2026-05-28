@@ -42,6 +42,7 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
+            background: var(--theme-bg, transparent);
         }
 
         .section-label {
@@ -63,6 +64,25 @@
             line-height: 0.9;
             color: var(--dark);
             margin-bottom: 40px;
+        }
+
+        /* ── THEME VARIATIONS ── */
+        .theme-ivory { --theme-bg: var(--white); }
+        .theme-mist { --theme-bg: var(--off-white); }
+        .theme-mintwash { --theme-bg: linear-gradient(180deg, rgba(93,217,200,0.18), rgba(248,249,250,0.9)); }
+        .theme-charcoal { --theme-bg: var(--dark); }
+
+        .theme-charcoal .section-headline,
+        .theme-charcoal .section-label,
+        .theme-charcoal .market-title,
+        .theme-charcoal .persona-title,
+        .theme-charcoal .business-title,
+        .theme-charcoal .gomarket-title,
+        .theme-charcoal .market-body,
+        .theme-charcoal .persona-body,
+        .theme-charcoal .business-body,
+        .theme-charcoal .gomarket-body {
+            color: var(--white);
         }
 
         /* ── HERO ── */
@@ -381,6 +401,138 @@
 
         .feat-body {
             font-size: 13px;
+            color: var(--text-body);
+            line-height: 1.5;
+        }
+
+        /* ── STAKEHOLDER ── */
+        .persona {
+            background: var(--off-white);
+        }
+
+        .persona-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .persona-card {
+            background: var(--white);
+            border: 1px solid var(--mid-gray);
+            border-top: 3px solid var(--mint);
+            padding: 28px;
+        }
+
+        .persona-title {
+            font-weight: 800;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: -0.01em;
+            margin-bottom: 12px;
+        }
+
+        .persona-body {
+            font-size: 14px;
+            color: var(--text-body);
+            line-height: 1.5;
+        }
+
+        /* ── TARGET MARKET ── */
+        .market {
+            background: var(--white);
+        }
+
+        .market-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .market-card {
+            background: var(--white);
+            border: 1px solid var(--mid-gray);
+            border-top: 3px solid var(--mint);
+            padding: 28px;
+        }
+
+        .market-title {
+            font-weight: 800;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: -0.01em;
+            margin-bottom: 10px;
+        }
+
+        .market-body {
+            font-size: 14px;
+            color: var(--text-body);
+            line-height: 1.5;
+        }
+
+        /* ── BUSINESS MODEL ── */
+        .business {
+            background: var(--off-white);
+        }
+
+        .business-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .business-card {
+            background: var(--white);
+            border: 1px solid var(--mid-gray);
+            border-top: 3px solid var(--mint);
+            padding: 28px;
+        }
+
+        .business-title {
+            font-weight: 800;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: -0.01em;
+            margin-bottom: 10px;
+        }
+
+        .business-body {
+            font-size: 14px;
+            color: var(--text-body);
+            line-height: 1.5;
+        }
+
+        /* ── GO-TO-MARKET ── */
+        .gomarket {
+            background: var(--white);
+        }
+
+        .gomarket-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .gomarket-card {
+            background: var(--white);
+            border: 1px solid var(--mid-gray);
+            border-top: 3px solid var(--mint);
+            padding: 28px;
+        }
+
+        .gomarket-title {
+            font-weight: 800;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: -0.01em;
+            margin-bottom: 10px;
+        }
+
+        .gomarket-body {
+            font-size: 14px;
             color: var(--text-body);
             line-height: 1.5;
         }
@@ -772,6 +924,10 @@
             .pain-grid { grid-template-columns: repeat(2, 1fr); }
             .sol-cards { grid-template-columns: repeat(2, 1fr); }
             .feat-grid { grid-template-columns: repeat(3, 1fr); }
+            .persona-grid { grid-template-columns: repeat(2, 1fr); }
+            .market-grid { grid-template-columns: repeat(2, 1fr); }
+            .business-grid { grid-template-columns: repeat(2, 1fr); }
+            .gomarket-grid { grid-template-columns: repeat(2, 1fr); }
             .metrics-grid { grid-template-columns: repeat(2, 1fr); }
             .road-grid { grid-template-columns: repeat(2, 1fr); }
             .why-grid { grid-template-columns: repeat(2, 1fr); }
@@ -785,6 +941,10 @@
             .pain-grid { grid-template-columns: 1fr; }
             .sol-cards { grid-template-columns: 1fr; }
             .feat-grid { grid-template-columns: repeat(2, 1fr); }
+            .persona-grid { grid-template-columns: 1fr; }
+            .market-grid { grid-template-columns: 1fr; }
+            .business-grid { grid-template-columns: 1fr; }
+            .gomarket-grid { grid-template-columns: 1fr; }
             .metrics-grid { grid-template-columns: 1fr; }
             .road-grid { grid-template-columns: 1fr; }
             .why-grid { grid-template-columns: 1fr; }
@@ -815,7 +975,7 @@
     </section>
 
     <!-- ── PROBLEM ── -->
-    <section class="section problem" id="problem">
+    <section class="section problem theme-ivory" id="problem">
         <div class="section-label">01 — The Problem</div>
         <h2 class="section-headline">Every Meeting<br>Vanishes.</h2>
         <div class="pain-grid">
@@ -846,11 +1006,31 @@
         </div>
     </section>
 
+    <!-- ── STAKEHOLDER / PERSONA ── -->
+    <section class="section persona theme-mintwash" id="stakeholder">
+        <div class="section-label">02 — Stakeholder / Persona</div>
+        <h2 class="section-headline">Who Feels<br>This Pain?</h2>
+        <div class="persona-grid">
+            <div class="persona-card">
+                <div class="persona-title">Decision-Makers</div>
+                <div class="persona-body">Founders, COOs, and ops leaders own meeting outcomes, budgets, and risk. They need continuity, trust, and fast retrieval of decisions.</div>
+            </div>
+            <div class="persona-card">
+                <div class="persona-title">Team Leads</div>
+                <div class="persona-body">Cross-functional leaders feel the daily pain of lost decisions, repeated discussions, and scattered context across tools.</div>
+            </div>
+            <div class="persona-card">
+                <div class="persona-title">Buying Triggers</div>
+                <div class="persona-body">Turnover, compliance pressure, and rapid growth make knowledge gaps visible and expensive — driving adoption.</div>
+            </div>
+        </div>
+    </section>
+
     <!-- ── SOLUTION ── -->
     <section class="section solution" id="solution">
         <div class="sol-geo-1"></div>
         <div class="sol-geo-2"></div>
-        <div class="section-label">02 — The Solution</div>
+        <div class="section-label">03 — The Solution</div>
         <h2 class="section-headline">Remembry</h2>
         <div class="sol-rule"></div>
         <p class="sol-body">A privacy-first desktop application that transforms meeting recordings into structured, searchable, long-term organizational knowledge — powered by multi-modal AI.</p>
@@ -874,8 +1054,8 @@
     </section>
 
     <!-- ── FEATURES ── -->
-    <section class="section features" id="features">
-        <div class="section-label">02 — How It Works</div>
+    <section class="section features theme-ivory" id="features">
+        <div class="section-label">03 — How It Works</div>
         <h2 class="section-headline">Core<br>Capabilities</h2>
         <div class="feat-grid">
             <div class="feat-card">
@@ -911,9 +1091,29 @@
         </div>
     </section>
 
+    <!-- ── TARGET MARKET ── -->
+    <section class="section market theme-mintwash" id="market">
+        <div class="section-label">04 — Target Market</div>
+        <h2 class="section-headline">Best-Fit<br>Customers</h2>
+        <div class="market-grid">
+            <div class="market-card">
+                <div class="market-title">SME Core</div>
+                <div class="market-body">Teams of roughly 10–200 employees that run meeting-heavy workflows and need continuity across projects.</div>
+            </div>
+            <div class="market-card">
+                <div class="market-title">Sensitive Work</div>
+                <div class="market-body">Professional services, agencies, SaaS, consulting, legal, healthcare admin, and finance operations.</div>
+            </div>
+            <div class="market-card">
+                <div class="market-title">Job-To-Be-Done</div>
+                <div class="market-body">Turn meetings into durable, searchable organizational memory — not just transcripts.</div>
+            </div>
+        </div>
+    </section>
+
     <!-- ── COMPETITOR ── -->
-    <section class="section competitor" id="competitor">
-        <div class="section-label">03 — Competition</div>
+    <section class="section competitor theme-ivory" id="competitor">
+        <div class="section-label">05 — Competition</div>
         <h2 class="section-headline">How We<br>Compare</h2>
         <div class="comp-table-wrap">
             <table class="comp-table">
@@ -995,9 +1195,102 @@
         </div>
     </section>
 
+    <!-- ── BUSINESS MODEL ── -->
+    <section class="section business theme-mintwash" id="business">
+        <div class="section-label">06 — Business Model</div>
+        <h2 class="section-headline">Simple<br>By Design</h2>
+        <div class="business-grid">
+            <div class="business-card">
+                <div class="business-title">$0 Platform Fee</div>
+                <div class="business-body">Users bring their own Gemini API key, keeping AI usage costs transparent and under their control.</div>
+            </div>
+            <div class="business-card">
+                <div class="business-title">No Lock-In</div>
+                <div class="business-body">Local-first storage and BYO keys avoid vendor dependency and support long-term trust.</div>
+            </div>
+            <div class="business-card">
+                <div class="business-title">Expansion Paths</div>
+                <div class="business-body">Team workspaces, admin controls, integrations, and enterprise packages can layer on without changing the trust model.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── PRICING ── -->
+    <section class="section pricing theme-ivory" id="pricing">
+        <div class="section-label">06 — Pricing</div>
+        <h2 class="section-headline">Cost<br>Comparison</h2>
+        <div class="pricing-grid">
+            <div class="price-card best">
+                <div class="price-name">Remembry</div>
+                <div class="price-value">$0</div>
+                <div class="price-unit">platform fee</div>
+                <div class="price-note">+ Bring your own Gemini API key. Use free tier. Cost control. No vendor lock-in.</div>
+            </div>
+            <div class="price-card">
+                <div class="price-name">Otter.ai</div>
+                <div class="price-value">$17</div>
+                <div class="price-unit">per user / month</div>
+                <div class="price-note">Team features require higher plans. Vendor-controlled cloud.</div>
+            </div>
+            <div class="price-card">
+                <div class="price-name">Fireflies.ai</div>
+                <div class="price-value">$18</div>
+                <div class="price-unit">per user / month</div>
+                <div class="price-note">Business features require higher tiers. Vendor-controlled cloud.</div>
+            </div>
+            <div class="price-card">
+                <div class="price-name">CAST</div>
+                <div class="price-value">$20</div>
+                <div class="price-unit">per user / month</div>
+                <div class="price-note">Pricing varies by plan. Vendor-controlled cloud.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── POSITIONING ── -->
+    <section class="section positioning theme-mintwash" id="positioning">
+        <div class="section-label">06 — Positioning</div>
+        <h2 class="section-headline">Our Position</h2>
+        <div class="pos-statement">
+            <p>"A privacy-first organizational memory platform for SMEs — not just another AI meeting note taker."</p>
+        </div>
+    </section>
+
+    <!-- ── GO-TO-MARKET ── -->
+    <section class="section gomarket theme-ivory" id="gomarket">
+        <div class="section-label">07 — Go-to-Market</div>
+        <h2 class="section-headline">How We<br>Win Adoption</h2>
+        <div class="gomarket-grid">
+            <div class="gomarket-card">
+                <div class="gomarket-title">Positioning</div>
+                <div class="gomarket-body">Privacy-first organizational memory for SMEs, not another meeting note app.</div>
+            </div>
+            <div class="gomarket-card">
+                <div class="gomarket-title">Entry Wedge</div>
+                <div class="gomarket-body">Local-first storage and BYO Gemini API keys build trust and keep costs transparent.</div>
+            </div>
+            <div class="gomarket-card">
+                <div class="gomarket-title">Channels</div>
+                <div class="gomarket-body">Demo-led outreach, founder communities, and product-led onboarding.</div>
+            </div>
+            <div class="gomarket-card">
+                <div class="gomarket-title">Adoption Flow</div>
+                <div class="gomarket-body">Install app → add Gemini key → upload or record → get structured knowledge.</div>
+            </div>
+            <div class="gomarket-card">
+                <div class="gomarket-title">Messaging</div>
+                <div class="gomarket-body">Stop losing decisions. Own your data. Searchable memory, not just transcripts.</div>
+            </div>
+            <div class="gomarket-card">
+                <div class="gomarket-title">Proof Points</div>
+                <div class="gomarket-body">Faster decision retrieval, fewer repeated meetings, stronger compliance posture, lower total cost.</div>
+            </div>
+        </div>
+    </section>
+
     <!-- ── METRICS ── -->
-    <section class="section metrics" id="metrics">
-        <div class="section-label">03 — Impact</div>
+    <section class="section metrics theme-mintwash" id="metrics">
+        <div class="section-label">08 — Scalability</div>
         <h2 class="section-headline">Measurable<br>ROI</h2>
         <div class="metrics-grid">
             <div class="metric-card">
@@ -1045,7 +1338,7 @@
 
     <!-- ── ROADMAP ── -->
     <section class="section roadmap" id="roadmap">
-        <div class="section-label">04 — Roadmap</div>
+        <div class="section-label">08 — Roadmap</div>
         <h2 class="section-headline">Four Phases</h2>
         <div class="road-grid">
             <div class="phase-card">
@@ -1099,7 +1392,7 @@
     <section class="section whynow" id="whynow">
         <div class="whynow-geo-1"></div>
         <div class="whynow-geo-2"></div>
-        <div class="section-label">05 — Why Now</div>
+        <div class="section-label">09 — Why Now</div>
         <h2 class="section-headline">The Time<br>Is Right</h2>
         <div class="why-grid">
             <div class="why-card">
@@ -1125,47 +1418,6 @@
         </div>
     </section>
 
-    <!-- ── PRICING ── -->
-    <section class="section pricing" id="pricing">
-        <div class="section-label">03 — Pricing</div>
-        <h2 class="section-headline">Cost<br>Comparison</h2>
-        <div class="pricing-grid">
-            <div class="price-card best">
-                <div class="price-name">Remembry</div>
-                <div class="price-value">$0</div>
-                <div class="price-unit">platform fee</div>
-                <div class="price-note">+ Bring your own Gemini API key. Use free tier. Cost control. No vendor lock-in.</div>
-            </div>
-            <div class="price-card">
-                <div class="price-name">Otter.ai</div>
-                <div class="price-value">$17</div>
-                <div class="price-unit">per user / month</div>
-                <div class="price-note">Team features require higher plans. Vendor-controlled cloud.</div>
-            </div>
-            <div class="price-card">
-                <div class="price-name">Fireflies.ai</div>
-                <div class="price-value">$18</div>
-                <div class="price-unit">per user / month</div>
-                <div class="price-note">Business features require higher tiers. Vendor-controlled cloud.</div>
-            </div>
-            <div class="price-card">
-                <div class="price-name">CAST</div>
-                <div class="price-value">$20</div>
-                <div class="price-unit">per user / month</div>
-                <div class="price-note">Pricing varies by plan. Vendor-controlled cloud.</div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ── POSITIONING ── -->
-    <section class="section positioning" id="positioning">
-        <div class="section-label">03 — Positioning</div>
-        <h2 class="section-headline">Our Position</h2>
-        <div class="pos-statement">
-            <p>"A privacy-first organizational memory platform for SMEs — not just another AI meeting note taker."</p>
-        </div>
-    </section>
-
     <!-- ── CLOSING ── -->
     <section class="section closing" id="closing">
         <h2>Build<br>Memory.</h2>
@@ -1182,14 +1434,18 @@
     <nav class="side-nav">
         <a href="#hero" title="Hero"></a>
         <a href="#problem" title="Problem"></a>
+        <a href="#stakeholder" title="Stakeholder"></a>
         <a href="#solution" title="Solution"></a>
         <a href="#features" title="Features"></a>
+        <a href="#market" title="Target Market"></a>
         <a href="#competitor" title="Competitor"></a>
-        <a href="#metrics" title="Metrics"></a>
-        <a href="#roadmap" title="Roadmap"></a>
-        <a href="#whynow" title="Why Now"></a>
+        <a href="#business" title="Business Model"></a>
         <a href="#pricing" title="Pricing"></a>
         <a href="#positioning" title="Positioning"></a>
+        <a href="#gomarket" title="Go-to-Market"></a>
+        <a href="#metrics" title="Scalability"></a>
+        <a href="#roadmap" title="Roadmap"></a>
+        <a href="#whynow" title="Why Now"></a>
         <a href="#closing" title="Close"></a>
     </nav>
 

@@ -5,7 +5,7 @@
 
 # PRESENTATION OVERVIEW
 
-**Total Slides:** 14
+**Total Slides:** 37
 **Estimated Duration:** 25–35 minutes (low density / speaker-led)
 **Target Audience:** SME decision-makers, investors, partners
 **Deck Theme:** Mint White — clean, professional, modern
@@ -87,11 +87,36 @@
 >
 > We're paying more and getting less coherence. Less continuity. Less actual institutional intelligence."
 
+
 ---
 
-# [SECTION 2 — SOLUTION]
+# [SECTION 2 — STAKEHOLDER / PERSONA]
 
-## Slide 7 — Section Header: The Solution
+## Slide 7 — Section Header: The Stakeholder
+
+**Tag:** `stakeholder-persona | sme-decision-makers`
+
+**Speaker Script:**
+> "Before we talk about the solution, let me be clear about who this is for. The primary stakeholder is an SME decision-maker — founders, COOs, and operations leaders who are accountable for meeting outcomes, budgeting, and risk.
+>
+> A secondary audience is team leads who run cross-functional meetings and feel the pain of lost decisions and repeated discussions most directly."
+
+---
+
+## Slide 8 — Stakeholder Needs & Triggers
+
+**Tag:** `stakeholder-needs | buying-triggers`
+
+**Speaker Script:**
+> "What do these leaders want? Trust in data ownership, speed in retrieving decisions, cost control without per-seat subscriptions, and easy adoption with minimal IT work.
+>
+> Adoption is usually triggered by turnover, compliance pressure, or rapid growth in meeting volume — the moment knowledge gaps become visible and expensive."
+
+---
+
+# [SECTION 3 — SOLUTION]
+
+## Slide 9 — Section Header: The Solution
 
 **Tag:** `remembry-introduction | privacy-first-desktop-app`
 
@@ -104,7 +129,7 @@
 
 ---
 
-## Slide 8 — Solution Overview: What Remembry Does
+## Slide 10 — Solution Overview: What Remembry Does
 
 **Tag:** `ai-powered-transcription | structured-knowledge-extraction`
 
@@ -117,7 +142,7 @@
 
 ---
 
-## Slide 9 — Core Feature: Local-First Privacy Architecture
+## Slide 11 — Core Feature: Local-First Privacy Architecture
 
 **Tag:** `local-storage | data-ownership | compliance-ready`
 
@@ -128,7 +153,7 @@
 
 ---
 
-## Slide 10 — Core Feature: Semantic Search and Q&A
+## Slide 12 — Core Feature: Semantic Search and Q&A
 
 **Tag:** `searchable-memory | contextual-retrieval | ai-query`
 
@@ -141,7 +166,7 @@
 
 ---
 
-## Slide 11 — Core Feature: Project-Based Organization
+## Slide 13 — Core Feature: Project-Based Organization
 
 **Tag:** `project-workspaces | meeting-continuity | knowledge-traceability`
 
@@ -152,9 +177,31 @@
 
 ---
 
-# [SECTION 3 — COMPETITOR ANALYSIS]
+# [SECTION 4 — TARGET MARKET]
 
-## Slide 12 — Section Header: Competitive Landscape
+## Slide 14 — Section Header: Target Market
+
+**Tag:** `target-market | sme-fit`
+
+**Speaker Script:**
+> "Remembry is designed for SMEs with roughly ten to two hundred employees — teams that rely heavily on meetings and handle sensitive discussions.
+>
+> The best-fit industries include professional services, agencies, SaaS startups, consulting, legal operations, healthcare administration, and financial operations."
+
+---
+
+## Slide 15 — Core Job-To-Be-Done
+
+**Tag:** `job-to-be-done | organizational-memory`
+
+**Speaker Script:**
+> "The core job is simple: turn meetings into durable, searchable organizational memory. Instead of decisions disappearing inside recordings or scattered notes, knowledge becomes structured and retrievable over time."
+
+---
+
+# [SECTION 5 — COMPETITOR ANALYSIS]
+
+## Slide 16 — Section Header: Competitive Landscape
 
 **Tag:** `competitor-analysis | market-positioning`
 
@@ -167,7 +214,7 @@
 
 ---
 
-## Slide 13 — Feature Comparison Table
+## Slide 17 — Feature Comparison Table
 
 **Tag:** `feature-comparison | local-storage-advantage | pricing-advantage`
 
@@ -188,7 +235,7 @@
 
 ---
 
-## Slide 14 — Productivity Impact Numbers
+## Slide 18 — Productivity Impact Numbers
 
 **Tag:** `measurable-roi | productivity-metrics | sme-impact`
 
@@ -213,7 +260,7 @@
 
 ---
 
-## Slide 15 — SME Team Scenario: Before vs After Remembry
+## Slide 19 — SME Team Scenario: Before vs After Remembry
 
 **Tag:** `team-productivity-scenario | operational-efficiency`
 
@@ -228,7 +275,7 @@
 
 ---
 
-## Slide 16 — Competitive Positioning Statement
+## Slide 20 — Competitive Positioning Statement
 
 **Tag:** `market-positioning-statement | memory-vs-transcription`
 
@@ -241,9 +288,53 @@
 
 ---
 
-# [SECTION 4 — SCALABILITY & ROADMAP]
+# [SECTION 6 — BUSINESS MODEL]
 
-## Slide 17 — Section Header: Roadmap
+## Slide 21 — Section Header: Business Model
+
+**Tag:** `business-model | pricing-structure`
+
+**Speaker Script:**
+> "The business model is simple and transparent: zero platform fee, and customers bring their own Gemini API key. That keeps costs usage-based and fully under customer control while avoiding vendor lock-in."
+
+---
+
+## Slide 22 — Value & Expansion Paths
+
+**Tag:** `value-drivers | monetization-paths`
+
+**Speaker Script:**
+> "The differentiation comes from local-first storage, structured knowledge extraction, and long-term memory — not just transcription. Over time, we can expand into team workspaces, admin controls, enterprise packages, and paid integrations without breaking the trust and privacy model."
+
+---
+
+# [SECTION 7 — GO-TO-MARKET]
+
+## Slide 23 — Section Header: Go-to-Market
+
+**Tag:** `go-to-market | positioning`
+
+**Speaker Script:**
+> "Our positioning is clear: privacy-first organizational memory for SMEs — not another meeting note app. The entry wedge is privacy plus cost control, which lowers both trust and budget barriers.
+>
+> Local-first storage means sensitive discussions stay under customer control, and BYO Gemini keys keep AI costs transparent. That combination creates trust and removes the subscription friction that blocks SME adoption."
+
+---
+
+## Slide 24 — Channels & Adoption Flow
+
+**Tag:** `gtm-channels | onboarding-flow`
+
+**Speaker Script:**
+> "We win through demo-led outreach to SME decision-makers, founder-led community distribution, and product-led onboarding. The flow is simple: install the app, add the Gemini key, upload or record, and get structured knowledge instantly.
+>
+> The messaging stays practical: stop losing decisions, own your data, and get searchable memory instead of raw transcripts. Proof points are tangible: faster decision retrieval, fewer repeated meetings, improved compliance posture, and lower total cost than subscription-based competitors."
+
+---
+
+# [SECTION 8 — SCALABILITY & ROADMAP]
+
+## Slide 25 — Section Header: Roadmap
 
 **Tag:** `product-roadmap | expansion-phases | future-vision`
 
@@ -252,7 +343,7 @@
 
 ---
 
-## Slide 18 — Phase 1: MVP Foundation
+## Slide 26 — Phase 1: MVP Foundation
 
 **Tag:** `mvp-features | core-workflow-validation`
 
@@ -263,7 +354,7 @@
 
 ---
 
-## Slide 19 — Phase 2: Platform Expansion
+## Slide 27 — Phase 2: Platform Expansion
 
 **Tag:** `multi-model-ai | integrations | cross-platform`
 
@@ -274,7 +365,7 @@
 
 ---
 
-## Slide 20 — Phase 3: Organizational Intelligence
+## Slide 28 — Phase 3: Organizational Intelligence
 
 **Tag:** `ai-powered-insights | decision-tracking | recurring-issue-detection`
 
@@ -285,7 +376,7 @@
 
 ---
 
-## Slide 21 — Phase 4: AI Knowledge Graph
+## Slide 29 — Phase 4: AI Knowledge Graph
 
 **Tag:** `knowledge-graph | people-projects-decisions | institutional-memory`
 
@@ -298,7 +389,7 @@
 
 ---
 
-## Slide 22 — Scalability Metrics Framework
+## Slide 30 — Scalability Metrics Framework
 
 **Tag:** `measurable-scalability | operational-metrics | future-evaluation`
 
@@ -325,9 +416,9 @@
 
 ---
 
-# [SECTION 5 — WHY NOW]
+# [SECTION 9 — WHY NOW]
 
-## Slide 23 — Section Header: Why Now
+## Slide 31 — Section Header: Why Now
 
 **Tag:** `market-timing | ai-maturity | privacy-demand`
 
@@ -336,7 +427,7 @@
 
 ---
 
-## Slide 24 — Why Now 1: Multi-Modal AI Maturity
+## Slide 32 — Why Now 1: Multi-Modal AI Maturity
 
 **Tag:** `gemini-gpt4o-whisper | low-cost-transcription | accessible-ai`
 
@@ -349,7 +440,7 @@
 
 ---
 
-## Slide 25 — Why Now 2: Privacy-First AI Demand
+## Slide 33 — Why Now 2: Privacy-First AI Demand
 
 **Tag:** `data-privacy-demand | compliance-requirements | local-first-trend`
 
@@ -362,7 +453,7 @@
 
 ---
 
-## Slide 26 — Why Now 3: Knowledge Loss Acceleration
+## Slide 34 — Why Now 3: Knowledge Loss Acceleration
 
 **Tag:** `meeting-intensity | knowledge-fragmentation | sme-vulnerability`
 
@@ -375,7 +466,7 @@
 
 ---
 
-## Slide 27 — Why Now 4: Market Gap
+## Slide 35 — Why Now 4: Market Gap
 
 **Tag:** `underserved-market | transcription-vs-memory | strategic-positioning`
 
@@ -388,9 +479,9 @@
 
 ---
 
-# [SECTION 6 — CLOSING]
+# [SECTION 10 — CLOSING]
 
-## Slide 28 — Closing Statement
+## Slide 36 — Closing Statement
 
 **Tag:** `vision-statement | long-term-mission | privacy-ai-memory`
 
@@ -407,7 +498,7 @@
 
 ---
 
-## Slide 29 — Call to Action
+## Slide 37 — Call to Action
 
 **Tag:** `demo-invitation | partnership | contact`
 
@@ -432,29 +523,37 @@
 | 4 | Pain: Employee Turnover | `institutional-knowledge-lost | employee-turnover` |
 | 5 | Pain: Cloud Privacy | `cloud-privacy-risk | data-compliance-concerns` |
 | 6 | Pain: Subscription Fragmentation | `subscription-fatigue | tool-overload` |
-| 7 | Section: Solution | `remembry-introduction | privacy-first-desktop-app` |
-| 8 | What Remembry Does | `ai-powered-transcription | structured-knowledge-extraction` |
-| 9 | Feature: Local Privacy | `local-storage | data-ownership | compliance-ready` |
-| 10 | Feature: Semantic Search | `searchable-memory | contextual-retrieval | ai-query` |
-| 11 | Feature: Project Organization | `project-workspaces | meeting-continuity | knowledge-traceability` |
-| 12 | Section: Competitors | `competitor-analysis | market-positioning` |
-| 13 | Feature Comparison | `feature-comparison | local-storage-advantage | pricing-advantage` |
-| 14 | Productivity Impact | `measurable-roi | productivity-metrics | sme-impact` |
-| 15 | SME Scenario | `team-productivity-scenario | operational-efficiency` |
-| 16 | Positioning Statement | `market-positioning-statement | memory-vs-transcription` |
-| 17 | Section: Roadmap | `product-roadmap | expansion-phases | future-vision` |
-| 18 | Phase 1: MVP | `mvp-features | core-workflow-validation` |
-| 19 | Phase 2: Platform | `multi-model-ai | integrations | cross-platform` |
-| 20 | Phase 3: Intelligence | `ai-powered-insights | decision-tracking | recurring-issue-detection` |
-| 21 | Phase 4: Knowledge Graph | `knowledge-graph | people-projects-decisions | institutional-memory` |
-| 22 | Scalability Metrics | `measurable-scalability | operational-metrics | future-evaluation` |
-| 23 | Section: Why Now | `market-timing | ai-maturity | privacy-demand` |
-| 24 | Why Now: AI Maturity | `gemini-gpt4o-whisper | low-cost-transcription | accessible-ai` |
-| 25 | Why Now: Privacy Demand | `data-privacy-demand | compliance-requirements | local-first-trend` |
-| 26 | Why Now: Knowledge Loss | `meeting-intensity | knowledge-fragmentation | sme-vulnerability` |
-| 27 | Why Now: Market Gap | `underserved-market | transcription-vs-memory | strategic-positioning` |
-| 28 | Closing Statement | `vision-statement | long-term-mission | privacy-ai-memory` |
-| 29 | Call to Action | `demo-invitation | partnership | contact` |
+| 7 | Section: Stakeholder | `stakeholder-persona | sme-decision-makers` |
+| 8 | Stakeholder Needs & Triggers | `stakeholder-needs | buying-triggers` |
+| 9 | Section: Solution | `remembry-introduction | privacy-first-desktop-app` |
+| 10 | What Remembry Does | `ai-powered-transcription | structured-knowledge-extraction` |
+| 11 | Feature: Local Privacy | `local-storage | data-ownership | compliance-ready` |
+| 12 | Feature: Semantic Search | `searchable-memory | contextual-retrieval | ai-query` |
+| 13 | Feature: Project Organization | `project-workspaces | meeting-continuity | knowledge-traceability` |
+| 14 | Section: Target Market | `target-market | sme-fit` |
+| 15 | Core Job-To-Be-Done | `job-to-be-done | organizational-memory` |
+| 16 | Section: Competitors | `competitor-analysis | market-positioning` |
+| 17 | Feature Comparison | `feature-comparison | local-storage-advantage | pricing-advantage` |
+| 18 | Productivity Impact | `measurable-roi | productivity-metrics | sme-impact` |
+| 19 | SME Scenario | `team-productivity-scenario | operational-efficiency` |
+| 20 | Positioning Statement | `market-positioning-statement | memory-vs-transcription` |
+| 21 | Section: Business Model | `business-model | pricing-structure` |
+| 22 | Value & Expansion Paths | `value-drivers | monetization-paths` |
+| 23 | Section: Go-to-Market | `go-to-market | positioning` |
+| 24 | Channels & Adoption Flow | `gtm-channels | onboarding-flow` |
+| 25 | Section: Roadmap | `product-roadmap | expansion-phases | future-vision` |
+| 26 | Phase 1: MVP | `mvp-features | core-workflow-validation` |
+| 27 | Phase 2: Platform | `multi-model-ai | integrations | cross-platform` |
+| 28 | Phase 3: Intelligence | `ai-powered-insights | decision-tracking | recurring-issue-detection` |
+| 29 | Phase 4: Knowledge Graph | `knowledge-graph | people-projects-decisions | institutional-memory` |
+| 30 | Scalability Metrics | `measurable-scalability | operational-metrics | future-evaluation` |
+| 31 | Section: Why Now | `market-timing | ai-maturity | privacy-demand` |
+| 32 | Why Now: AI Maturity | `gemini-gpt4o-whisper | low-cost-transcription | accessible-ai` |
+| 33 | Why Now: Privacy Demand | `data-privacy-demand | compliance-requirements | local-first-trend` |
+| 34 | Why Now: Knowledge Loss | `meeting-intensity | knowledge-fragmentation | sme-vulnerability` |
+| 35 | Why Now: Market Gap | `underserved-market | transcription-vs-memory | strategic-positioning` |
+| 36 | Closing Statement | `vision-statement | long-term-mission | privacy-ai-memory` |
+| 37 | Call to Action | `demo-invitation | partnership | contact` |
 
 ---
 
@@ -464,11 +563,15 @@
 | ------- | ------ | ----------------------- |
 | [COVER] | 1 | Who are we and what do we solve? |
 | [SECTION 1 — PROBLEM] | 2–6 | Do these pain points resonate? |
-| [SECTION 2 — SOLUTION] | 7–11 | How does Remembry solve this? |
-| [SECTION 3 — COMPETITOR] | 12–16 | Why is this better than alternatives? |
-| [SECTION 4 — ROADMAP] | 17–22 | What does the future look like? |
-| [SECTION 5 — WHY NOW] | 23–27 | Why is the timing right? |
-| [SECTION 6 — CLOSING] | 28–29 | What's the ask / next step? |
+| [SECTION 2 — STAKEHOLDER / PERSONA] | 7–8 | Who feels this pain most? |
+| [SECTION 3 — SOLUTION] | 9–13 | How does Remembry solve this? |
+| [SECTION 4 — TARGET MARKET] | 14–15 | Who is the best-fit customer? |
+| [SECTION 5 — COMPETITOR] | 16–20 | Why is this better than alternatives? |
+| [SECTION 6 — BUSINESS MODEL] | 21–22 | How is it priced and sustained? |
+| [SECTION 7 — GO-TO-MARKET] | 23–24 | How do we win adoption? |
+| [SECTION 8 — ROADMAP] | 25–30 | What does the future look like? |
+| [SECTION 9 — WHY NOW] | 31–35 | Why is the timing right? |
+| [SECTION 10 — CLOSING] | 36–37 | What's the ask / next step? |
 
 ---
 

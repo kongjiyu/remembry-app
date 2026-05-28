@@ -23,6 +23,13 @@
 
 ---
 
+## Stakeholder / Persona
+- Primary: founders, COOs, and ops leaders who own decisions, budgets, and risk
+- Secondary: team leads who run meetings and feel the daily pain of missing context
+- They want privacy, fast retrieval, and low adoption friction
+
+---
+
 ## Our Solution (3 Core Features)
 1. **Local-first privacy** — all data stays on device, user controls everything
 2. **AI-powered extraction** — structured summaries, action items, decisions, Q&A
@@ -30,10 +37,31 @@
 
 ---
 
+## Target Market
+- SMEs (roughly 10–200 employees) with meeting-heavy workflows
+- Teams handling sensitive info: agencies, SaaS, consulting, legal, healthcare admin, finance
+- Job-to-be-done: turn meetings into durable, searchable organizational memory
+
+---
+
 ## Key Differentiation
 - Competitors (Otter, Fireflies, CAST) = transcription tools
 - Remembry = **organizational memory** platform
 - "Memory vs notes" — we connect decisions across time, not just record them
+
+---
+
+## Business Model
+- $0 platform fee + BYO Gemini API key
+- Customers control AI usage costs and avoid per-seat subscription creep
+- Trust and cost control drive adoption
+
+---
+
+## Go-to-Market
+- Direct demos to SME decision-makers
+- Founder-led outreach in COO and ops communities
+- Product-led onboarding: install → add key → upload/record → get notes
 
 ---
 
