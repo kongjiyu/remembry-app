@@ -88,7 +88,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            src-tauri/target/release/bundle/*.dmg
+            src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/remembry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
