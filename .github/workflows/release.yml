@@ -6,10 +6,6 @@ on:
       - "v*"
   workflow_dispatch:
 
-concurrency:
-  group: release
-  cancel-in-progress: true
-
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -23,8 +19,8 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install Rust
-        uses: dtolnay/rust-action@stable
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
         with:
           targets: x86_64-pc-windows-msvc
 
@@ -36,25 +32,23 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-      - name: Find installer files
+      - name: List bundle output
         shell: bash
         run: |
-          echo "NSIS files:"
-          find src-tauri/target/release/bundle -name "*.exe" -type f 2>/dev/null | head -5
-          echo "MSI files:"
-          find src-tauri/target/release/bundle -name "*.msi" -type f 2>/dev/null | head -5
+          echo "=== Bundle contents ==="
+          find src-tauri/target/release/bundle -type f 2>/dev/null || echo "No bundle dir"
+          echo "=== Release dir ==="
+          ls -la src-tauri/target/release/*.exe 2>/dev/null || echo "No exe in release"
 
       - name: Upload NSIS installer
+        if: always()
         uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
-          files: src-tauri/target/release/bundle/nsis/*.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload MSI installer
-        uses: softprops/action-gh-release@v2
-        with:
-          files: src-tauri/target/release/bundle/msi/*.msi
+          tag_name: ${{ github.ref_name }}
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -70,8 +64,8 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install Rust
-        uses: dtolnay/rust-action@stable
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
 
       - name: Install frontend dependencies
         run: npm ci
@@ -79,9 +73,15 @@ jobs:
       - name: Build Tauri
         run: npm run tauri:build
 
+      - name: List release output
+        run: ls -la src-tauri/target/release/remembry 2>/dev/null || echo "No binary"
+
       - name: Upload macOS binary
+        if: always()
         uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
+          tag_name: ${{ github.ref_name }}
           files: src-tauri/target/release/remembry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
