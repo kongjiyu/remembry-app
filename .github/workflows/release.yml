@@ -69,19 +69,26 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri
+      - name: Build Tauri (DMG)
         run: npm run tauri:build
 
-      - name: List release output
-        run: ls -la src-tauri/target/release/remembry 2>/dev/null || echo "No binary"
+      - name: List bundle output
+        run: |
+          echo "=== Bundle contents ==="
+          find src-tauri/target/release/bundle -type f 2>/dev/null || echo "No bundle dir"
 
-      - name: Upload macOS binary
+      - name: Upload macOS assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/release/remembry
+          files: |
+            src-tauri/target/release/bundle/*.dmg
+            src-tauri/target/release/remembry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
