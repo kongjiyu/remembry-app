@@ -12,8 +12,6 @@ import {
     Mic,
     Clock,
     FileText,
-    Download,
-    Share2,
     CheckCircle2,
     MessageSquare,
     ArrowLeft,
@@ -213,16 +211,6 @@ function EventDetailContent() {
                                 )}
                             </div>
                         </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                        <Button variant="outline" size="sm" className="gap-2">
-                            <Download className="size-4" />
-                            Export
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-2">
-                            <Share2 className="size-4" />
-                            Share
-                        </Button>
                     </div>
                 </div>
 

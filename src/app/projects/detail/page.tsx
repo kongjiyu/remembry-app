@@ -781,7 +781,6 @@ function ProjectDetailContent() {
                                                                 Ask Questions
                                                             </Link>
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem>Download</DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={() => {
                                                                 setMeetingToDelete(meeting);
