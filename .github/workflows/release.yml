@@ -6,6 +6,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -38,13 +41,9 @@ jobs:
         run: |
           echo "=== Bundle contents ==="
           find src-tauri/target/release/bundle -type f 2>/dev/null || echo "No bundle dir"
-          echo "=== Release dir ==="
-          ls -la src-tauri/target/release/*.exe 2>/dev/null || echo "No exe in release"
 
-      - name: Upload NSIS installer
-        if: always()
+      - name: Upload Windows installers
         uses: softprops/action-gh-release@v2
-        continue-on-error: true
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -80,9 +79,7 @@ jobs:
         run: ls -la src-tauri/target/release/remembry 2>/dev/null || echo "No binary"
 
       - name: Upload macOS binary
-        if: always()
         uses: softprops/action-gh-release@v2
-        continue-on-error: true
         with:
           tag_name: ${{ github.ref_name }}
           files: src-tauri/target/release/remembry
