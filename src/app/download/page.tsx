@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import Image from "next/image";
 
 const GITHUB_LATEST = "https://github.com/kongjiyu/remembry-app/releases/latest";
 const GITHUB_REPO = "https://github.com/kongjiyu/remembry-app";
