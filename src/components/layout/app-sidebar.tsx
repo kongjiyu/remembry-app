@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
 import { usePathname } from "next/navigation";
 import {
     Sidebar,
@@ -57,7 +57,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild className="group-data-[collapsible=icon]:p-0">
-                            <Link href="/dashboard" className="flex items-center gap-3">
+                            <AppLink href="/dashboard" className="flex items-center gap-3">
                                 <img
                                     src="/remembry-logo.png"
                                     alt="Remembry"
@@ -67,7 +67,7 @@ export function AppSidebar() {
                                     <span className="font-semibold text-lg tracking-tight">Remembry</span>
                                     <span className="text-xs text-muted-foreground">AI Event Notes</span>
                                 </div>
-                            </Link>
+                            </AppLink>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
@@ -86,10 +86,10 @@ export function AppSidebar() {
                                         tooltip={item.title}
                                         className="rounded-lg transition-all duration-200"
                                     >
-                                        <Link href={item.url}>
+                                        <AppLink href={item.url}>
                                             <item.icon className="size-4" />
                                             <span>{item.title}</span>
-                                        </Link>
+                                        </AppLink>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}
@@ -109,10 +109,10 @@ export function AppSidebar() {
                                         tooltip={item.title}
                                         className="rounded-lg transition-all duration-200"
                                     >
-                                        <Link href={item.url}>
+                                        <AppLink href={item.url}>
                                             <item.icon className="size-4" />
                                             <span>{item.title}</span>
-                                        </Link>
+                                        </AppLink>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, Loader2, MessageCircle, ExternalLink, Calendar } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 
 interface AskSource {
@@ -120,13 +120,13 @@ function AskContent() {
             <div className="space-y-6 max-w-3xl">
                 {/* Back button */}
                 <Button variant="outline" size="sm" asChild>
-                    <Link href={scope === "meeting" && projectName
+                    <AppLink href={scope === "meeting" && projectName
                         ? `/events/detail?id=${encodeURIComponent(eventId)}&projectName=${encodeURIComponent(projectName)}&displayName=${encodeURIComponent(displayName)}`
                         : `/projects/detail?id=${encodeURIComponent(projectName)}`
                     }>
                         <ArrowLeft className="size-4 mr-2" />
                         Back
-                    </Link>
+                    </AppLink>
                 </Button>
 
                 {/* Question form */}
@@ -194,7 +194,7 @@ function AskContent() {
                                         {response.sources.map((source) => {
                                             const sourceUrl = `/events/detail?id=${encodeURIComponent(source.meetingId)}&projectName=${encodeURIComponent(projectName)}&displayName=${encodeURIComponent(displayName)}`;
                                             return (
-                                                <Link
+                                                <AppLink
                                                     key={source.id}
                                                     href={sourceUrl}
                                                     className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
@@ -212,7 +212,7 @@ function AskContent() {
                                                             {source.snippet}
                                                         </p>
                                                     </div>
-                                                </Link>
+                                                </AppLink>
                                             );
                                         })}
                                     </div>
