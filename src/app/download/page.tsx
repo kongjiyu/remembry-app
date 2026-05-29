@@ -3,8 +3,14 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 
-const GITHUB_LATEST = "https://github.com/kongjiyu/remembry-app/releases/latest";
+const VERSION = "v0.1.0";
 const GITHUB_REPO = "https://github.com/kongjiyu/remembry-app";
+const GITHUB_LATEST = `${GITHUB_REPO}/releases/latest`;
+
+const ASSETS = {
+  macos: `${GITHUB_REPO}/releases/download/${VERSION}/Remembry_0.1.0_aarch64.dmg`,
+  windows: `${GITHUB_REPO}/releases/download/${VERSION}/Remembry_0.1.0_x64-setup.exe`,
+};
 
 function detectPlatform(): string {
   if (typeof window === "undefined") return "windows";
@@ -43,21 +49,33 @@ export default function DownloadPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-4">
-            <a
-              href={GITHUB_LATEST}
-              className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.91 1.33-.34 2.61-.41 3.05-.43l.93-.03h.93v6.75c.01.81.08 1.54.26 2.16.28.91 1.01 1.51 2.09 1.51.73 0 1.4-.25 1.94-.65l.05.09.08.1v3.08h3.61v-.01c.28-.14.54-.32.79-.52.17-.14.33-.29.47-.45 1.36-1.58 1.7-3.77.95-5.64l-.04.04zm-6.03-3.25c-.47-.01-.94.09-1.4.27-.47.18-.87.47-1.19.82-.32.35-.55.77-.66 1.21-.11.44-.09.9.05 1.33.13.44.4.84.76 1.12.36.28.8.46 1.27.49.47.03.93-.09 1.33-.32.4-.23.73-.58.96-1.01.23-.43.32-.91.27-1.38-.05-.47-.26-.91-.58-1.24-.32-.33-.73-.56-1.17-.65l-.04-.04zm-3.56 1.77c-.29 0-.58.05-.85.17-.27.12-.5.29-.69.5-.19.21-.33.47-.42.74-.09.28-.09.57.01.84.1.28.28.52.51.69.23.18.51.28.81.29.3.01.59-.07.85-.23.26-.16.46-.39.59-.67.13-.28.17-.58.11-.88-.06-.3-.22-.56-.45-.76-.23-.2-.51-.32-.81-.35l-.15-.03.49-.31z"/>
-              </svg>
-              Download for macOS
-            </a>
+            {platform === "macos" ? (
+              <a
+                href={ASSETS.macos}
+                className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.91 1.33-.34 2.61-.41 3.05-.43l.93-.03h.93v6.75c.01.81.08 1.54.26 2.16.28.91 1.01 1.51 2.09 1.51.73 0 1.4-.25 1.94-.65l.05.09.08.1v3.08h3.61v-.01c.28-.14.54-.32.79-.52.17-.14.33-.29.47-.45 1.36-1.58 1.7-3.77.95-5.64l-.04.04zm-6.03-3.25c-.47-.01-.94.09-1.4.27-.47.18-.87.47-1.19.82-.32.35-.55.77-.66 1.21-.11.44-.09.9.05 1.33.13.44.4.84.76 1.12.36.28.8.46 1.27.49.47.03.93-.09 1.33-.32.4-.23.73-.58.96-1.01.23-.43.32-.91.27-1.38-.05-.47-.26-.91-.58-1.24-.32-.33-.73-.56-1.17-.65l-.04-.04zm-3.56 1.77c-.29 0-.58.05-.85.17-.27.12-.5.29-.69.5-.19.21-.33.47-.42.74-.09.28-.09.57.01.84.1.28.28.52.51.69.23.18.51.28.81.29.3.01.59-.07.85-.23.26-.16.46-.39.59-.67.13-.28.17-.58.11-.88-.06-.3-.22-.56-.45-.76-.23-.2-.51-.32-.81-.35l-.15-.03.49-.31z"/>
+                </svg>
+                Download for macOS (.dmg)
+              </a>
+            ) : (
+              <a
+                href={ASSETS.windows}
+                className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3 20.25v-13.5h7.5l9 9.75-9 9.75H3v-6zm15-2.25L13.5 13.5v5.25H18v-5.25z"/>
+                </svg>
+                Download for Windows (.exe)
+              </a>
+            )}
           </div>
 
           <p className="text-sm text-muted-foreground">
             {platform === "macos"
-              ? "macOS detected — download Remembry from GitHub Releases"
-              : "Download for macOS. Windows and Linux builds coming soon."}
+              ? "macOS detected — download the aarch64 DMG"
+              : "Windows installer recommended. macOS DMG also available."}
             {" "}
             <a href={GITHUB_REPO} target="_blank" rel="noopener" className="text-primary hover:underline">
               View all releases
