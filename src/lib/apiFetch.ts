@@ -96,18 +96,18 @@ const TAURI_COMMANDS: TauriCommandEntry[] = [
     const m = matchRoute("/api/events/:id/knowledge", p);
     return { meetingId: m?.id || "", language: q?.get("language") || "en" };
   }},
-  { pattern: "/api/events/:id/knowledge", method: "POST", command: "extract_event_knowledge", extractParams: (p, _, body) => {
+  { pattern: "/api/events/:id/knowledge", method: "POST", command: "enqueue_event_knowledge_extraction", extractParams: (p, _, body) => {
     const m = matchRoute("/api/events/:id/knowledge", p);
-    return { meetingId: m?.id || "", language: (body as { language?: string })?.language || "en" };
+    return { meetingId: m?.id || "", language: (body as { language?: string })?.language || "en", mode: "extract" };
   }},
   { pattern: "/api/events/:id/knowledge", method: "PUT", command: "update_event_knowledge", extractParams: (p, _, body) => {
     const m = matchRoute("/api/events/:id/knowledge", p);
     const b = body as { language?: string; knowledge?: unknown };
     return { meetingId: m?.id || "", language: b?.language || "en", knowledge: b?.knowledge };
   }},
-  { pattern: "/api/events/:id/regenerate", method: "POST", command: "regenerate_event_knowledge", extractParams: (p, _, body) => {
+  { pattern: "/api/events/:id/regenerate", method: "POST", command: "enqueue_event_knowledge_extraction", extractParams: (p, _, body) => {
     const m = matchRoute("/api/events/:id/regenerate", p);
-    return { meetingId: m?.id || "", language: (body as { language?: string })?.language || "en" };
+    return { meetingId: m?.id || "", language: (body as { language?: string })?.language || "en", mode: "regenerate" };
   }},
   { pattern: "/api/settings/gemini-key", method: "GET", command: "get_gemini_key_status", extractParams: () => ({}) },
   { pattern: "/api/settings/gemini-key", method: "POST", command: "save_gemini_key", extractParams: (_, __, body) => ({ apiKey: (body as { apiKey?: string })?.apiKey || "" }) },

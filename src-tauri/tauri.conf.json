@@ -42,6 +42,11 @@
       "nsis": {
         "installMode": "currentUser"
       }
+    },
+    "macOS": {
+      "signingIdentity": "Developer ID Application: Ji Yu Kong (D579YXN546)",
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "10.13"
     }
   },
   "plugins": {}

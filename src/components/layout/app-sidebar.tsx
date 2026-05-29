@@ -19,7 +19,6 @@ import {
     LayoutDashboard,
     Mic,
     Settings,
-    Sparkles,
     FolderKanban,
 } from "lucide-react";
 
@@ -59,9 +58,11 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild className="group-data-[collapsible=icon]:p-0">
                             <Link href="/dashboard" className="flex items-center gap-3">
-                                <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
-                                    <Sparkles className="size-5" />
-                                </div>
+                                <img
+                                    src="/remembry-logo.png"
+                                    alt="Remembry"
+                                    className="size-8 shrink-0 rounded-xl object-contain"
+                                />
                                 <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
                                     <span className="font-semibold text-lg tracking-tight">Remembry</span>
                                     <span className="text-xs text-muted-foreground">AI Event Notes</span>

@@ -449,42 +449,30 @@ export function EventKnowledgeDisplay({ eventId, initialLanguage = "en", meeting
     }, [meetingId]);
 
     const handleExtract = async () => {
-        setIsExtracting(true);
         try {
-            const res = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/knowledge`, {
+            await apiFetch(`/api/events/${encodeURIComponent(eventId)}/knowledge`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ language }),
             });
-            if (!res.ok) throw new Error("Failed to extract knowledge");
-            const data = await res.json() as { knowledge: EventKnowledge };
-            setKnowledge(normalizeKnowledge(data.knowledge as unknown as Record<string, unknown>));
-            toast.success("Knowledge extracted successfully!");
+            toast.success("Knowledge extraction queued. You can keep using the app.");
         } catch (error) {
-            console.error("Error extracting knowledge:", error);
-            toast.error("Failed to extract knowledge. Please try again.");
-        } finally {
-            setIsExtracting(false);
+            console.error("Error enqueueing extraction:", error);
+            toast.error("Failed to queue extraction. Please try again.");
         }
     };
 
     const handleRegenerate = async () => {
-        setIsExtracting(true);
         try {
-            const res = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/regenerate`, {
+            await apiFetch(`/api/events/${encodeURIComponent(eventId)}/regenerate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ language }),
             });
-            if (!res.ok) throw new Error("Failed to regenerate knowledge");
-            const data = await res.json() as { knowledge: EventKnowledge };
-            setKnowledge(normalizeKnowledge(data.knowledge as unknown as Record<string, unknown>));
-            toast.success("Knowledge regenerated successfully!");
+            toast.success("Knowledge regeneration queued. You can keep using the app.");
         } catch (error) {
-            console.error("Error regenerating knowledge:", error);
-            toast.error("Failed to regenerate knowledge. Please try again.");
-        } finally {
-            setIsExtracting(false);
+            console.error("Error enqueueing regeneration:", error);
+            toast.error("Failed to queue regeneration. Please try again.");
         }
     };
 
@@ -521,29 +509,17 @@ export function EventKnowledgeDisplay({ eventId, initialLanguage = "en", meeting
     };
 
     const handleGenerateLanguage = async (langCode: string) => {
-        setIsExtracting(true);
         try {
             toast.info(`Generating knowledge in ${SUPPORTED_LANGUAGES.find(l => l.code === langCode)?.name}...`);
-            const res = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/regenerate`, {
+            await apiFetch(`/api/events/${encodeURIComponent(eventId)}/regenerate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ language: langCode }),
             });
-            if (!res.ok) throw new Error("Failed to generate knowledge");
-            const data = await res.json() as { knowledge: EventKnowledge; language: string };
-            const normalized = normalizeKnowledge(data.knowledge as unknown as Record<string, unknown>);
-            setKnowledge(normalized);
-            setCachedKnowledge(prev => ({ ...prev, [data.language]: normalized }));
-            setLanguage(data.language);
-            if (!availableLanguages.includes(data.language)) {
-                setAvailableLanguages(prev => [...prev, data.language]);
-            }
-            toast.success(`Knowledge generated in ${SUPPORTED_LANGUAGES.find(l => l.code === data.language)?.name}!`);
+            toast.success(`Knowledge generation queued for ${SUPPORTED_LANGUAGES.find(l => l.code === langCode)?.name}. You can keep using the app.`);
         } catch (error) {
             console.error("Error generating language:", error);
-            toast.error("Failed to generate knowledge. Please try again.");
-        } finally {
-            setIsExtracting(false);
+            toast.error("Failed to queue knowledge generation. Please try again.");
         }
     };
 

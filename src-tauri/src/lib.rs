@@ -209,6 +209,7 @@ pub fn run() {
             commands::events::update_event_knowledge,
             commands::events::extract_event_knowledge,
             commands::events::regenerate_event_knowledge,
+            commands::events::enqueue_event_knowledge_extraction,
             commands::ask::ask_question,
         ])
         .setup(|app| {

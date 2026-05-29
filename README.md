@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="./public/logo.svg" alt="Remembry" width="120" />
+  <img src="./public/remembry-logo.png" alt="Remembry - AI-Powered Meeting Notes" width="140" />
 </p>
 
 <p align="center">
-  <img alt="Typing animation" src="https://readme-typing-svg.demolab.com?font=Avenir&weight=700&size=24&duration=2200&pause=900&color=8B5CF6&center=true&vCenter=true&width=780&lines=AI-Powered+Meeting+Notes;Transform+Recordings+into+Structured+Notes;Search+Across+All+Your+Meetings">
+  <img src="./public/readme-header.png" alt="Remembry transforms audio recordings into structured, searchable meeting notes with AI" style="max-width: 900px; width: 100%;" />
 </p>
 
 <p align="center">

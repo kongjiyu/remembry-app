@@ -32,7 +32,7 @@ export function DashboardLayout({ children, breadcrumbs = [], title }: Dashboard
                                 <BreadcrumbLink href="/dashboard" className="hover:text-primary transition-colors">Home</BreadcrumbLink>
                             </BreadcrumbItem>
                             {breadcrumbs.map((crumb, index) => (
-                                <span key={crumb.label} className="contents">
+                                <span key={`${crumb.label}-${index}`} className="contents">
                                     <BreadcrumbSeparator />
                                     <BreadcrumbItem>
                                         {index === breadcrumbs.length - 1 || !crumb.href ? (

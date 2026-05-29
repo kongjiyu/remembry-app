@@ -66,13 +66,17 @@ export function UploadJobsBanner({ onJobCompleted }: UploadJobsBannerProps) {
                     <CardContent className="p-4">
                         <div className="flex items-center gap-2 mb-3">
                             <Loader2 className="size-4 animate-spin text-blue-500" />
-                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Active uploads</span>
+                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Active background tasks</span>
                         </div>
                         <div className="space-y-2">
                             {activeJobs.map((job) => (
                                 <div key={job.job_id} className="flex items-center gap-3">
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{job.title}</p>
+                                        <p className="text-sm font-medium truncate">
+                                            {job.job_type === "knowledge_extraction"
+                                                ? `Extracting knowledge for ${job.title}`
+                                                : job.title}
+                                        </p>
                                         <p className="text-xs text-blue-600 dark:text-blue-400">{job.message}</p>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
@@ -97,7 +101,7 @@ export function UploadJobsBanner({ onJobCompleted }: UploadJobsBannerProps) {
                     <CardContent className="min-w-0 overflow-hidden p-4">
                         <div className="flex items-center gap-2 mb-2">
                             <AlertCircle className="size-4 text-red-500" />
-                            <span className="text-sm font-medium text-red-700 dark:text-red-300">Failed uploads</span>
+                            <span className="text-sm font-medium text-red-700 dark:text-red-300">Failed background tasks</span>
                         </div>
                         <div className="space-y-3">
                             {failedJobs.map((job) => (
@@ -105,7 +109,11 @@ export function UploadJobsBanner({ onJobCompleted }: UploadJobsBannerProps) {
                                     <div className="flex min-w-0 items-start gap-3">
                                         <div className="min-w-0 flex-1">
                                             {job.title && (
-                                                <p className="min-w-0 truncate text-sm">{job.title}</p>
+                                                <p className="min-w-0 truncate text-sm">
+                                                    {job.job_type === "knowledge_extraction"
+                                                        ? `Knowledge extraction for ${job.title}`
+                                                        : job.title}
+                                                </p>
                                             )}
                                             <p className="mt-1 max-w-full whitespace-normal text-xs leading-relaxed text-red-500 [overflow-wrap:anywhere]">
                                                 {normalizeUploadError(job.error, job.status)}

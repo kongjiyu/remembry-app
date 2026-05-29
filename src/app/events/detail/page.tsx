@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useEffect, useCallback, useReducer } from "react";
 import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EventKnowledgeDisplay } from "@/components/ui/event-knowledge-display";
+import { UploadJobsBanner } from "@/components/ui/upload-jobs-banner";
 import {
     Mic,
     Clock,
@@ -91,28 +92,57 @@ function formatTimestamp(seconds?: number): string {
 
 function EventDetailContent() {
     const searchParams = useSearchParams();
-    const [event, setEvent] = useState<EventData | null>(null);
-    const [loading, setLoading] = useState(true);
+    type EventState = { event: EventData | null; loading: boolean };
+    type EventAction = { type: "fetch"; event: EventData } | { type: "fetching" } | { type: "error" };
+
+    const reducer = useCallback((state: EventState, action: EventAction): EventState => {
+        switch (action.type) {
+            case "fetching": return { ...state, loading: true };
+            case "fetch": return { event: action.event, loading: false };
+            case "error": return { ...state, loading: false };
+        }
+    }, []);
+
+    const [state, dispatch] = useReducer(reducer, { event: null, loading: true });
+
+    const event = state.event;
+    const loading = state.loading;
 
     const id = searchParams.get("id") || "";
     const projectName = searchParams.get("projectName") || "";
     const displayName = searchParams.get("displayName") || "";
 
-    useEffect(() => {
+    const fetchEvent = useCallback(() => {
         if (!id) return;
-
+        dispatch({ type: "fetching" });
         apiFetch(`/api/meetings/${encodeURIComponent(id)}`)
             .then((res) => {
                 if (!res.ok) throw new Error("Failed to fetch event");
                 return res.json();
             })
             .then((data) => {
-                setEvent(data.meeting);
-                setLoading(false);
+                dispatch({ type: "fetch", event: data.meeting });
             })
             .catch(() => {
-                setLoading(false);
+                dispatch({ type: "error" });
             });
+    }, [id]);
+
+    useEffect(() => {
+        fetchEvent();
+    }, [fetchEvent]);
+
+    const handleJobCompleted = useCallback(() => {
+        if (!id) return;
+        apiFetch(`/api/meetings/${encodeURIComponent(id)}`)
+            .then((res) => {
+                if (!res.ok) throw new Error("Failed to refetch event");
+                return res.json();
+            })
+            .then((data) => {
+                dispatch({ type: "fetch", event: data.meeting });
+            })
+            .catch(() => { /* ignore */ });
     }, [id]);
 
     if (loading) {
@@ -169,6 +199,8 @@ function EventDetailContent() {
             title={event.title}
         >
             <div className="space-y-6">
+                <UploadJobsBanner onJobCompleted={handleJobCompleted} />
+
                 <Button variant="outline" size="sm" asChild>
                     <Link href={projectName ? `/projects/detail?id=${encodeURIComponent(projectName)}` : "/events"}>
                         <ArrowLeft className="size-4 mr-2" />

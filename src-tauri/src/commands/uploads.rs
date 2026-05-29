@@ -37,6 +37,8 @@ pub struct UploadJob {
     pub title: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub job_type: String,
 }
 
 impl From<UploadJobRecord> for UploadJob {
@@ -52,6 +54,7 @@ impl From<UploadJobRecord> for UploadJob {
             title: r.title,
             created_at: r.created_at,
             updated_at: r.updated_at,
+            job_type: r.job_type,
         }
     }
 }
@@ -138,6 +141,7 @@ fn job_record_to_upload_job(record: UploadJobRecord) -> UploadJob {
         title: record.title.clone(),
         created_at: record.created_at.clone(),
         updated_at: record.updated_at.clone(),
+        job_type: record.job_type,
     }
 }
 
@@ -336,6 +340,7 @@ pub fn enqueue_meeting_upload_processing(
         temp_path: Some(temp_path_str),
         params_json: Some(params_json),
         gemini_file_name: None,
+        job_type: "upload".to_string(),
     };
     if let Err(e) = db::upload_jobs::upsert_upload_job(&record) {
         let _ = std::fs::remove_file(&temp_path);

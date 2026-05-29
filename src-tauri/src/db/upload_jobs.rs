@@ -19,13 +19,15 @@ pub struct UploadJobRecord {
     pub temp_path: Option<String>,
     pub params_json: Option<String>,
     pub gemini_file_name: Option<String>,
+    #[serde(default)]
+    pub job_type: String,
 }
 
 /// Insert or replace an upload job record in SQLite.
 pub fn upsert_upload_job(job: &UploadJobRecord) -> Result<(), String> {
     with_db(|conn| {
         conn.execute(
-            "INSERT OR REPLACE INTO upload_jobs (job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            "INSERT OR REPLACE INTO upload_jobs (job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name, job_type) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 job.job_id,
                 job.status,
@@ -40,6 +42,7 @@ pub fn upsert_upload_job(job: &UploadJobRecord) -> Result<(), String> {
                 job.temp_path,
                 job.params_json,
                 job.gemini_file_name,
+                job.job_type,
             ],
         ).map_err(|e| e.to_string())?;
         Ok(())
@@ -50,7 +53,7 @@ pub fn upsert_upload_job(job: &UploadJobRecord) -> Result<(), String> {
 pub fn list_upload_jobs() -> Result<Vec<UploadJobRecord>, String> {
     with_db(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name FROM upload_jobs ORDER BY created_at DESC"
+            "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name, job_type FROM upload_jobs ORDER BY created_at DESC"
         ).map_err(|e| e.to_string())?;
 
         let rows = stmt.query_map([], |row| {
@@ -68,6 +71,7 @@ pub fn list_upload_jobs() -> Result<Vec<UploadJobRecord>, String> {
                 temp_path: row.get(10)?,
                 params_json: row.get(11)?,
                 gemini_file_name: row.get(12)?,
+                job_type: row.get(13)?,
             })
         }).map_err(|e| e.to_string())?;
 
@@ -79,7 +83,7 @@ pub fn list_upload_jobs() -> Result<Vec<UploadJobRecord>, String> {
 pub fn get_upload_job(job_id: &str) -> Result<Option<UploadJobRecord>, String> {
     with_db(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name FROM upload_jobs WHERE job_id = ?1"
+            "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name, job_type FROM upload_jobs WHERE job_id = ?1"
         ).map_err(|e| e.to_string())?;
 
         let mut rows = stmt.query_map(params![job_id], |row| {
@@ -97,6 +101,7 @@ pub fn get_upload_job(job_id: &str) -> Result<Option<UploadJobRecord>, String> {
                 temp_path: row.get(10)?,
                 params_json: row.get(11)?,
                 gemini_file_name: row.get(12)?,
+                job_type: row.get(13)?,
             })
         }).map_err(|e| e.to_string())?;
 
@@ -161,7 +166,7 @@ pub fn delete_upload_job(job_id: &str) -> Result<(), String> {
 }
 
 fn list_interrupted_jobs_query() -> &'static str {
-    "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name FROM upload_jobs WHERE status IN ('queued', 'uploading', 'processing', 'transcribing', 'saving', 'cleanup_pending')"
+    "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name, job_type FROM upload_jobs WHERE status IN ('queued', 'uploading', 'processing', 'transcribing', 'saving', 'cleanup_pending', 'extracting_knowledge')"
 }
 
 /// List all non-terminal job records (used by startup recovery).
@@ -188,6 +193,7 @@ pub fn list_interrupted_jobs_with_conn(conn: &rusqlite::Connection) -> Result<Ve
             temp_path: row.get(10)?,
             params_json: row.get(11)?,
             gemini_file_name: row.get(12)?,
+            job_type: row.get(13)?,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -195,7 +201,7 @@ pub fn list_interrupted_jobs_with_conn(conn: &rusqlite::Connection) -> Result<Ve
 }
 
 fn list_interrupted_jobs_with_gemini_file_query() -> &'static str {
-    "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name FROM upload_jobs WHERE status IN ('queued', 'uploading', 'processing', 'transcribing', 'saving', 'cleanup_pending') AND gemini_file_name IS NOT NULL AND gemini_file_name != ''"
+    "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name, job_type FROM upload_jobs WHERE status IN ('queued', 'uploading', 'processing', 'transcribing', 'saving', 'cleanup_pending', 'extracting_knowledge') AND gemini_file_name IS NOT NULL AND gemini_file_name != ''"
 }
 
 /// List non-terminal jobs that have a gemini_file_name set.
@@ -225,6 +231,7 @@ pub fn list_interrupted_jobs_with_gemini_file_with_conn(conn: &rusqlite::Connect
             temp_path: row.get(10)?,
             params_json: row.get(11)?,
             gemini_file_name: row.get(12)?,
+            job_type: row.get(13)?,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -558,6 +565,7 @@ mod tests {
                 temp_path: row.get(2)?,
                 params_json: None,
                 gemini_file_name: None,
+                job_type: String::new(),
             })).map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;

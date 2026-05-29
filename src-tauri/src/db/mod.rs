@@ -95,7 +95,8 @@ fn schema_sql() -> &'static str {
         updated_at      TEXT NOT NULL,
         temp_path       TEXT,
         params_json     TEXT,
-        gemini_file_name TEXT
+        gemini_file_name TEXT,
+        job_type        TEXT NOT NULL DEFAULT 'upload'
     );
     "#
 }
@@ -110,6 +111,7 @@ impl DbPool {
         // Migration: add event_type, event_tags, knowledge_by_language columns
         // to existing databases that only have notes_by_language
         migrate_meetings_table(&conn).map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
+        migrate_upload_jobs_table(&conn).map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
         log::info!("SQLite database initialized at {:?}", db_path);
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -160,6 +162,25 @@ fn migrate_meetings_table(conn: &Connection) -> Result<(), String> {
         // Migrate existing notes_by_language → knowledge_by_language for non-null rows
         conn.execute(
             "UPDATE meetings SET knowledge_by_language = notes_by_language WHERE notes_by_language IS NOT NULL AND knowledge_by_language IS NULL",
+            [],
+        ).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Migrate existing upload_jobs table to add job_type column.
+fn migrate_upload_jobs_table(conn: &Connection) -> Result<(), String> {
+    let mut stmt = conn.prepare("PRAGMA table_info(upload_jobs)").map_err(|e| e.to_string())?;
+    let columns: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    if !columns.contains(&"job_type".to_string()) {
+        conn.execute(
+            "ALTER TABLE upload_jobs ADD COLUMN job_type TEXT NOT NULL DEFAULT 'upload'",
             [],
         ).map_err(|e| e.to_string())?;
     }

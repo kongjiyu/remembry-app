@@ -16,6 +16,7 @@ export interface UploadJob {
     title: string;
     created_at: string;
     updated_at: string;
+    job_type: string;
 }
 
 export function useUploadJobs(pollIntervalMs = 3000) {
