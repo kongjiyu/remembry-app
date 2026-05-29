@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { open } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 export interface AudioRecorderState {
     isRecording: boolean;
@@ -21,6 +21,7 @@ export interface AudioRecorderActions {
     resumeRecording: () => void;
     resetRecording: () => void;
     requestPermission: () => Promise<boolean>;
+    openSystemMicrophoneSettings: () => Promise<void>;
 }
 
 export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
@@ -267,7 +268,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         const ua = navigator.userAgent.toLowerCase();
         const url = ua.includes("win") ? windowsUrl : macOSUrl;
         try {
-            await open(url);
+            await openUrl(url);
         } catch {
             // fallback: show instructions in next error display
         }

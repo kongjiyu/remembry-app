@@ -58,8 +58,8 @@ export async function downloadAndInstall(onProgress?: (pct: number) => void): Pr
     }
     await update.downloadAndInstall((event) => {
       if (event.event === "Progress") {
-        const total = event.data.contentLength ?? 0;
-        const downloaded = event.data.chunkLength ?? 0;
+        const total = (event.data as { contentLength?: number }).contentLength ?? 0;
+        const downloaded = (event.data as { chunkLength?: number }).chunkLength ?? 0;
         const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
         notify("downloading", updateInfo ?? undefined, pct);
         onProgress?.(pct);

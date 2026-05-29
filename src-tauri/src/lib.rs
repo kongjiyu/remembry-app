@@ -7,9 +7,6 @@ mod uploads;
 pub mod commands;
 
 use tauri::Manager;
-use tauri_plugin_updater::UpdaterExt;
-use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_process::ProcessExt;
 
 #[tauri::command]
 fn get_app_temp_dir(app: tauri::AppHandle) -> Result<String, String> {
