@@ -42,15 +42,61 @@ jobs:
           echo "=== Bundle contents ==="
           find src-tauri/target/release/bundle -type f 2>/dev/null || echo "No bundle dir"
 
+      - name: Generate updater manifest
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          EXE_PATH=$(find src-tauri/target/release/bundle/nsis -name "*.exe" -not -name "*.exe.sig" 2>/dev/null | head -1)
+
+          if [ -z "$EXE_PATH" ] || [ ! -f "$EXE_PATH" ]; then
+            echo "Error: No NSIS .exe found in bundle directory" >&2
+            exit 1
+          fi
+
+          EXE_SIG_PATH="${EXE_PATH}.sig"
+
+          if [ ! -f "$EXE_SIG_PATH" ]; then
+            echo "Error: Missing updater signature for $(basename "$EXE_PATH")" >&2
+            exit 1
+          fi
+
+          EXE_SIG=$(cat "$EXE_SIG_PATH")
+
+          EXE_URL="https://github.com/kongjiyu/remembry-app/releases/download/${{ github.ref_name }}/$(basename "$EXE_PATH")"
+
+          cat > latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Remembry v${VERSION}",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "windows-x86_64": {
+                "url": "${EXE_URL}",
+                "signature": "${EXE_SIG}"
+              }
+            }
+          }
+          EOF
+
+          echo "=== latest.json ==="
+          cat latest.json
+          echo ""
+          echo "=== JSON validation ==="
+          node -e "JSON.parse(require('fs').readFileSync('latest.json','utf8')); console.log('Valid JSON')"
+
       - name: Upload Windows installers
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.sig
+            src-tauri/target/release/bundle/nsis/*.exe.sig
             src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/msi/*.sig
+            src-tauri/target/release/bundle/msi/*.msi.sig
+            latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import {
     subscribeToUpdates,
     checkForUpdates,
@@ -63,6 +64,7 @@ export default function SettingsPage() {
     const [updateInfo, setUpdateInfo] = useState<{ version: string; notes?: string } | null>(null);
     const [updateProgress, setUpdateProgress] = useState(0);
     const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
+    const [appVersion, setAppVersion] = useState<string>("");
 
     useEffect(() => {
         setMounted(true);
@@ -80,6 +82,10 @@ export default function SettingsPage() {
             }
         });
         return unsub;
+    }, []);
+
+    useEffect(() => {
+        getVersion().then((v) => setAppVersion(v)).catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -197,7 +203,7 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-between">
                             <div className="text-sm">
                                 <span className="text-muted-foreground">Current version: </span>
-                                <span className="font-medium">v0.2.0</span>
+                                <span className="font-medium">{appVersion ? `v${appVersion}` : "..."}</span>
                             </div>
                             {updateStatus === "available" && updateInfo && (
                                 <Badge variant="default" className="bg-primary">New version available</Badge>
