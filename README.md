@@ -32,6 +32,18 @@
 
 ---
 
+## Downloads
+
+Get the latest version from [GitHub Releases](https://github.com/kongjiyu/remembry-app/releases/latest).
+
+| Platform | File | Notes |
+|----------|------|-------|
+| macOS (Apple Silicon) | `Remembry_0.2.0_aarch64.dmg` | Notarized for Gatekeeper |
+| Windows (NSIS) | `Remembry_0.2.0_x64-setup.exe` | Installer wizard |
+| Windows (MSI) | `Remembry_0.2.0_x64_en-US.msi` | Enterprise deployment |
+
+---
+
 ## Screenshots
 
 | Page | Preview |
