@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,15 +42,29 @@ function AskContent() {
     const displayName = searchParams.get("displayName") || "";
     const eventName = searchParams.get("name") || "";
     const eventId = searchParams.get("id") || "";
+    const initialQuestion = searchParams.get("question") || "";
 
-    const [question, setQuestion] = useState("");
+    const [question, setQuestion] = useState(initialQuestion);
     const [isLoading, setIsLoading] = useState(false);
     const [response, setResponse] = useState<AskResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [autoSubmitted, setAutoSubmitted] = useState(false);
 
     const pageTitle = scope === "meeting" && eventName
         ? `Ask: ${eventName}`
         : `Ask: ${displayName}`;
+
+    // Auto-submit once on page load when question comes from dashboard
+    useEffect(() => {
+        if (initialQuestion && projectName && scope === "project" && !autoSubmitted) {
+            setAutoSubmitted(true);
+            // Small delay to ensure state is set
+            const timer = setTimeout(() => {
+                document.querySelector<HTMLFormElement>("form")?.requestSubmit();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [initialQuestion, projectName, scope, autoSubmitted]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

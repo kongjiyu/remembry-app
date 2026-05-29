@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,9 @@ export default function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [meetings, setMeetings] = useState<NormalizedMeeting[]>([]);
     const [loading, setLoading] = useState(true);
+    const [dashboardQuestion, setDashboardQuestion] = useState("");
+    const [selectedAskProjectId, setSelectedAskProjectId] = useState<string>("");
+    const router = useRouter();
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -70,7 +74,30 @@ export default function DashboardPage() {
         loadData();
     }, [loadData]);
 
+    // Set default selected project for Ask once data loads
+    useEffect(() => {
+        if (projects.length > 0 && !selectedAskProjectId) {
+            // Prefer project with events
+            const projectIdsWithEvents = new Set(meetings.map(m => m.project_id));
+            const projectWithEvents = projects.find(p => projectIdsWithEvents.has(p.id));
+            setSelectedAskProjectId(projectWithEvents?.id ?? projects[0].id);
+        }
+    }, [projects, meetings, selectedAskProjectId]);
+
     const totalMeetings = meetings.length;
+
+    const selectedProject = projects.find(p => p.id === selectedAskProjectId);
+
+    const handleAskSubmit = () => {
+        if (!dashboardQuestion.trim() || !selectedAskProjectId || !selectedProject) return;
+        const params = new URLSearchParams({
+            scope: "project",
+            projectName: selectedAskProjectId,
+            displayName: selectedProject.display_name,
+            question: dashboardQuestion.trim(),
+        });
+        router.push(`/ask?${params.toString()}`);
+    };
 
     const projectMeetingCounts = new Map<string, number>();
     for (const m of meetings) {
@@ -112,16 +139,46 @@ export default function DashboardPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="relative z-10 space-y-4">
-                            <div className="relative max-w-xl">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-5" />
-                                <Input
-                                    className="pl-10 h-12 bg-background/50 backdrop-blur-sm border-primary/20 focus-visible:ring-primary/30 text-base shadow-sm rounded-xl"
-                                    placeholder="Ask Remembry: &quot;What did we decide about the roadmap?&quot;"
-                                />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-lg">
-                                        <ArrowRight className="size-4" />
-                                    </Button>
+                            <div className="space-y-3">
+                                {projects.length > 0 ? (
+                                    <select
+                                        value={selectedAskProjectId}
+                                        onChange={e => setSelectedAskProjectId(e.target.value)}
+                                        className="w-full max-w-xs h-9 px-3 rounded-lg border border-primary/20 bg-background/50 backdrop-blur-sm text-sm shadow-sm cursor-pointer"
+                                    >
+                                        {projects.map(p => (
+                                            <option key={p.id} value={p.id}>{p.display_name}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Create a project before asking Remembry.</p>
+                                )}
+                                <div className="relative max-w-xl">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-5" />
+                                    <Input
+                                        className="pl-10 h-12 bg-background/50 backdrop-blur-sm border-primary/20 focus-visible:ring-primary/30 text-base shadow-sm rounded-xl"
+                                        placeholder="Ask Remembry: &quot;What did we decide about the roadmap?&quot;"
+                                        value={dashboardQuestion}
+                                        onChange={e => setDashboardQuestion(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleAskSubmit();
+                                            }
+                                        }}
+                                        disabled={projects.length === 0}
+                                    />
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0 rounded-lg"
+                                            onClick={handleAskSubmit}
+                                            disabled={!dashboardQuestion.trim() || !selectedAskProjectId || projects.length === 0}
+                                        >
+                                            <ArrowRight className="size-4" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4 pt-2">
