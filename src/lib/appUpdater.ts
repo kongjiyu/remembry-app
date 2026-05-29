@@ -73,6 +73,6 @@ export async function downloadAndInstall(onProgress?: (pct: number) => void): Pr
   }
 }
 
-export function getCurrentStatus(): { status: UpdateStatus; info?: UpdateInfo; progress: number } {
-  return { status: currentStatus, info: updateInfo ?? undefined, progress };
+export function getCurrentStatus(): { status: UpdateStatus; info?: UpdateInfo; progress: number; errorMessage?: string } {
+  return { status: currentStatus, info: updateInfo ?? undefined, progress, errorMessage: errorMessage || undefined };
 }

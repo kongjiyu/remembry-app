@@ -62,6 +62,7 @@ export default function SettingsPage() {
     const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
     const [updateInfo, setUpdateInfo] = useState<{ version: string; notes?: string } | null>(null);
     const [updateProgress, setUpdateProgress] = useState(0);
+    const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -72,6 +73,11 @@ export default function SettingsPage() {
         const unsub = subscribeToUpdates((status, info) => {
             setUpdateStatus(status);
             setUpdateInfo(info ?? null);
+            if (status === "error") {
+                setUpdateErrorMessage(getCurrentStatus().errorMessage ?? "An error occurred while checking for updates.");
+            } else {
+                setUpdateErrorMessage(null);
+            }
         });
         return unsub;
     }, []);
@@ -207,6 +213,9 @@ export default function SettingsPage() {
                                 </Badge>
                             )}
                         </div>
+                        {updateStatus === "error" && updateErrorMessage && (
+                            <p className="text-sm text-destructive">{updateErrorMessage}</p>
+                        )}
                         {updateStatus === "available" && updateInfo?.notes && (
                             <div className="p-3 rounded-lg bg-muted/50 border text-sm text-muted-foreground max-h-32 overflow-y-auto">
                                 {updateInfo.notes}
