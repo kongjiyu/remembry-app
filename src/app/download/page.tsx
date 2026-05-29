@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 
-const VERSION = "v0.1.0";
+const VERSION = "v0.2.0";
 const GITHUB_REPO = "https://github.com/kongjiyu/remembry-app";
 const GITHUB_LATEST = `${GITHUB_REPO}/releases/latest`;
 
 const ASSETS = {
-  macos: `${GITHUB_REPO}/releases/download/${VERSION}/Remembry_0.1.0_aarch64.dmg`,
-  windows: `${GITHUB_REPO}/releases/download/${VERSION}/Remembry_0.1.0_x64-setup.exe`,
+  macos: `${GITHUB_REPO}/releases/download/${VERSION}/Remembry_0.2.0_aarch64.dmg`,
+  windows: `${GITHUB_REPO}/releases/download/${VERSION}/Remembry_0.2.0_x64-setup.exe`,
 };
 
 function detectPlatform(): string {
