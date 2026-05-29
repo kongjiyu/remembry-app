@@ -8,10 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FolderKanban, Plus } from "lucide-react";
 import { apiFetch } from "@/lib/apiFetch";
-import { useRouter } from "next/navigation";
+import { navigateTo } from "@/lib/navigation";
 
 export default function NewProjectPage() {
-    const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form state
@@ -46,7 +45,7 @@ export default function NewProjectPage() {
             console.log('Project created successfully:', data.project);
 
             // Redirect to projects page
-            router.push("/projects");
+            navigateTo("/projects");
         } catch (error) {
             console.error('Error creating project:', error);
             alert(error instanceof Error ? error.message : 'Failed to create project');
@@ -164,7 +163,7 @@ export default function NewProjectPage() {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => router.back()}
+                            onClick={() => navigateTo('/', { replace: true })}
                             disabled={isSubmitting}
                         >
                             Cancel

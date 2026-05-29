@@ -5,7 +5,7 @@ import { useUploadJobs } from "@/hooks/useUploadJobs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle, X } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
 
 interface UploadJobsBannerProps {
     onJobCompleted?: (jobId: string) => void;
@@ -120,12 +120,12 @@ export function UploadJobsBanner({ onJobCompleted }: UploadJobsBannerProps) {
                                             </p>
                                         </div>
                                         {job.meeting_id && (
-                                            <Link
+                                            <AppLink
                                                 href={`/events/detail?id=${encodeURIComponent(job.meeting_id)}`}
                                                 className="shrink-0 text-xs text-primary hover:underline"
                                             >
                                                 View
-                                            </Link>
+                                            </AppLink>
                                         )}
                                         <Button
                                             type="button"

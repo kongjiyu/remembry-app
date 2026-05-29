@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { FolderKanban, Plus, Search, MoreVertical, Mic, CheckCircle2, Trash2, Loader2 } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 import { normalizeMeeting, buildProjectMap, countMeetingsByProject, type NormalizedMeeting } from "@/lib/meetingViews";
 import {
@@ -136,10 +136,10 @@ export default function ProjectsPage() {
                         </div>
                     </div>
                     <Button asChild size="lg" className="gap-2">
-                        <Link href="/projects/new">
+                        <AppLink href="/projects/new">
                             <Plus className="size-5" />
                             New Project
-                        </Link>
+                        </AppLink>
                     </Button>
                 </div>
 
@@ -218,10 +218,10 @@ export default function ProjectsPage() {
                             </p>
                             {!searchQuery && (
                                 <Button asChild>
-                                    <Link href="/projects/new">
+                                    <AppLink href="/projects/new">
                                         <Plus className="size-4 mr-2" />
                                         Create Project
-                                    </Link>
+                                    </AppLink>
                                 </Button>
                             )}
                         </CardContent>
@@ -256,7 +256,7 @@ export default function ProjectsPage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/projects/detail?id=${encodeURIComponent(project.id)}`}>View Details</Link>
+                                                        <AppLink href={`/projects/detail?id=${encodeURIComponent(project.id)}`}>View Details</AppLink>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={(e) => {
                                                         e.preventDefault();
@@ -286,7 +286,7 @@ export default function ProjectsPage() {
                                             </div>
                                             <div className="pt-2">
                                                 <Button asChild className="w-full" variant={eventCount === 0 ? "default" : "outline"}>
-                                                    <Link href={eventCount === 0 ? `/events/new` : `/projects/detail?id=${encodeURIComponent(project.id)}`}>
+                                                    <AppLink href={eventCount === 0 ? `/events/new` : `/projects/detail?id=${encodeURIComponent(project.id)}`}>
                                                         {eventCount === 0 ? (
                                                             <>
                                                                 <Plus className="size-4 mr-2" />
@@ -295,7 +295,7 @@ export default function ProjectsPage() {
                                                         ) : (
                                                             'View Details'
                                                         )}
-                                                    </Link>
+                                                    </AppLink>
                                                 </Button>
                                             </div>
                                         </div>

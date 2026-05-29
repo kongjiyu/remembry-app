@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,8 @@ import {
     Sparkles,
     Clock,
 } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
+import { navigateTo } from "@/lib/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatMimeBadgeLabel } from "@/lib/meetingViews";
@@ -107,7 +108,7 @@ function KnowledgeRow({ item, project }: { item: ProjectKnowledgeItem; project: 
         : <Badge variant="outline" className="text-xs text-purple-600 border-purple-200 bg-purple-50/50 dark:bg-purple-500/10 dark:border-purple-500/30 dark:text-purple-300">Question</Badge>;
 
     return (
-        <Link
+        <AppLink
             href={eventUrl}
             className="flex gap-3 p-4 rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/30 transition-all items-start group"
         >
@@ -140,13 +141,12 @@ function KnowledgeRow({ item, project }: { item: ProjectKnowledgeItem; project: 
                     <span className="text-xs text-muted-foreground">{formatDate(item.sourceEventDate)}</span>
                 </div>
             </div>
-        </Link>
+        </AppLink>
     );
 }
 
 function ProjectDetailContent() {
     const searchParams = useSearchParams();
-    const router = useRouter();
 
     const projectName = searchParams.get("id") || "";
 
@@ -264,7 +264,7 @@ function ProjectDetailContent() {
                 throw new Error(error.error || 'Failed to delete project');
             }
 
-            router.push('/projects');
+            navigateTo('/projects');;
         } catch (error) {
             console.error('Error deleting project:', error);
             alert(error instanceof Error ? error.message : 'Failed to delete project');
@@ -346,10 +346,10 @@ function ProjectDetailContent() {
                             The project you&apos;re looking for doesn&apos;t exist or has been deleted.
                         </p>
                         <Button asChild>
-                            <Link href="/projects">
+                            <AppLink href="/projects">
                                 <ArrowLeft className="size-4 mr-2" />
                                 Back to Projects
-                            </Link>
+                            </AppLink>
                         </Button>
                     </CardContent>
                 </Card>
@@ -371,23 +371,23 @@ function ProjectDetailContent() {
                 {/* Header Actions */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-between">
                     <Button variant="outline" asChild>
-                        <Link href="/projects">
+                        <AppLink href="/projects">
                             <ArrowLeft className="size-4 mr-2" />
                             Back to Projects
-                        </Link>
+                        </AppLink>
                     </Button>
                     <div className="flex gap-2">
                         <Button variant="outline" asChild>
-                            <Link href={`/ask?scope=project&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`}>
+                            <AppLink href={`/ask?scope=project&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`}>
                                 <MessageCircleQuestion className="size-4 mr-2" />
                                 Ask Questions
-                            </Link>
+                            </AppLink>
                         </Button>
                         <Button asChild className="gap-2">
-                            <Link href={meetingsNewUrl}>
+                            <AppLink href={meetingsNewUrl}>
                                 <Upload className="size-4" />
                                 Upload Event
-                            </Link>
+                            </AppLink>
                         </Button>
                         <Button variant="outline" onClick={() => setShowEditDialog(true)}>
                             Edit Project
@@ -658,7 +658,7 @@ function ProjectDetailContent() {
                                             {(isOverviewSearching || expandedTabs["needs_extraction"] ? displayedOverview.missingEvents : displayedOverview.missingEvents.slice(0, 6)).map((evt) => {
                                                 const meetingUrl = `/events/detail?id=${encodeURIComponent(evt.id)}&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`;
                                                 return (
-                                                    <Link
+                                                    <AppLink
                                                         key={evt.id}
                                                         href={meetingUrl}
                                                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
@@ -666,7 +666,7 @@ function ProjectDetailContent() {
                                                         <FileText className="size-4 text-muted-foreground" />
                                                         <span>{evt.title || "Untitled Event"}</span>
                                                         <span className="text-xs text-muted-foreground ml-1">{formatDate(evt.date)}</span>
-                                                    </Link>
+                                                    </AppLink>
                                                 );
                                             })}
                                             {!isOverviewSearching && displayedOverview.missingEvents.length > 6 && (
@@ -718,10 +718,10 @@ function ProjectDetailContent() {
                                 </p>
                                 {!searchQuery && (
                                     <Button asChild>
-                                        <Link href={meetingsNewUrl}>
+                                        <AppLink href={meetingsNewUrl}>
                                             <Plus className="size-4 mr-2" />
                                             Upload Event
-                                        </Link>
+                                        </AppLink>
                                     </Button>
                                 )}
                             </CardContent>
@@ -735,7 +735,7 @@ function ProjectDetailContent() {
                                     <Card key={meeting.id || index} className="group hover:shadow-md transition-shadow relative">
                                         <CardHeader>
                                             <div className="flex items-start justify-between gap-3">
-                                                <Link
+                                                <AppLink
                                                     href={meetingUrl}
                                                     className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
                                                 >
@@ -759,7 +759,7 @@ function ProjectDetailContent() {
                                                             )}
                                                         </CardDescription>
                                                     </div>
-                                                </Link>
+                                                </AppLink>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                                         <Button
@@ -772,14 +772,14 @@ function ProjectDetailContent() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={meetingUrl}>
+                                                            <AppLink href={meetingUrl}>
                                                                 View Transcript
-                                                            </Link>
+                                                            </AppLink>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/ask?scope=meeting&id=${encodeURIComponent(meeting.id)}&name=${encodeURIComponent(meeting.display_name)}&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`}>
+                                                            <AppLink href={`/ask?scope=meeting&id=${encodeURIComponent(meeting.id)}&name=${encodeURIComponent(meeting.display_name)}&projectName=${encodeURIComponent(project.id)}&displayName=${encodeURIComponent(project.display_name)}`}>
                                                                 Ask Questions
-                                                            </Link>
+                                                            </AppLink>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={() => {

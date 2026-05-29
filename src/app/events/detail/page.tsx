@@ -18,7 +18,7 @@ import {
     ArrowLeft,
     FolderKanban,
 } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 
 interface TranscriptionSegment {
@@ -161,7 +161,7 @@ function EventDetailContent() {
                 <div className="flex flex-col items-center justify-center py-12">
                     <p className="text-muted-foreground">Event not found</p>
                     <Button variant="outline" className="mt-4" asChild>
-                        <Link href="/events">Back to Events</Link>
+                        <AppLink href="/events">Back to Events</AppLink>
                     </Button>
                 </div>
             </DashboardLayout>
@@ -202,10 +202,10 @@ function EventDetailContent() {
                 <UploadJobsBanner onJobCompleted={handleJobCompleted} />
 
                 <Button variant="outline" size="sm" asChild>
-                    <Link href={projectName ? `/projects/detail?id=${encodeURIComponent(projectName)}` : "/events"}>
+                    <AppLink href={projectName ? `/projects/detail?id=${encodeURIComponent(projectName)}` : "/events"}>
                         <ArrowLeft className="size-4 mr-2" />
                         {projectName ? "Back to Project" : "Back to Events"}
-                    </Link>
+                    </AppLink>
                 </Button>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-between">

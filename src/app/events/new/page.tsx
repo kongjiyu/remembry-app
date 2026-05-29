@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiFetch } from "@/lib/apiFetch";
 import { invoke } from "@tauri-apps/api/core";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
+import { navigateTo } from "@/lib/navigation";
 import { toast } from "sonner";
 import {
     Dialog,
@@ -137,7 +138,6 @@ function ModeParamHandler({ onModeChange, onQuickRecordEntry }: { onModeChange: 
 }
 
 export default function NewEventPage() {
-    const router = useRouter();
     const [inputMode, setInputMode] = useState<InputMode>("upload");
     const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -441,7 +441,7 @@ export default function NewEventPage() {
             enqueued = true;
 
             toast.success("Upload queued. Processing in background.");
-            router.push('/events');
+            navigateTo('/events');
         } catch (error) {
             console.error('Error uploading event:', error);
 
@@ -457,7 +457,7 @@ export default function NewEventPage() {
         } finally {
             setIsProcessing(false);
         }
-    }, [uploadedFile, selectedProject, title, notes, selectedEventType, eventTags, router]);
+    }, [uploadedFile, selectedProject, title, notes, selectedEventType, eventTags]);
 
     const shouldAutoStart = inputMode === "record" && isQuickRecordEntry;
 
@@ -777,7 +777,7 @@ export default function NewEventPage() {
                 {/* Submit Button */}
                 <div className="flex justify-end gap-3">
                     <Button variant="outline" asChild>
-                        <Link href="/events">Cancel</Link>
+                        <AppLink href="/events">Cancel</AppLink>
                     </Button>
                     <Button
                         onClick={handleSubmit}

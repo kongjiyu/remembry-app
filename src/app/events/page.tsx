@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Mic, Upload, Search, MoreVertical, Clock, CheckCircle2, Loader2, AlertCircle, FolderKanban, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 import { normalizeMeeting, buildProjectMap, formatMimeBadgeLabel, type NormalizedMeeting } from "@/lib/meetingViews";
 import { UploadJobsBanner } from "@/components/ui/upload-jobs-banner";
@@ -151,10 +151,10 @@ export default function EventsPage() {
                         />
                     </div>
                     <Button asChild className="gap-2">
-                        <Link href="/events/new">
+                        <AppLink href="/events/new">
                             <Upload className="size-4" />
                             Upload Recording
-                        </Link>
+                        </AppLink>
                     </Button>
                 </div>
 
@@ -184,10 +184,10 @@ export default function EventsPage() {
                             </p>
                             {!searchQuery && (
                                 <Button asChild>
-                                    <Link href="/events/new">
+                                    <AppLink href="/events/new">
                                         <Upload className="size-4 mr-2" />
                                         Upload Recording
-                                    </Link>
+                                    </AppLink>
                                 </Button>
                             )}
                         </CardContent>
@@ -202,7 +202,7 @@ export default function EventsPage() {
                                 <Card key={meeting.id || meeting.name || index} className="group hover:shadow-lg transition-all hover:border-primary/50 relative">
                                     <CardHeader className="pb-3">
                                         <div className="flex items-start justify-between gap-2 min-w-0">
-                                            <Link
+                                            <AppLink
                                                 href={`/events/detail?id=${encodedDocName}&projectName=${encodeURIComponent(meeting.project_id || meeting.projectName)}&displayName=${encodeURIComponent(meeting.projectDisplayName || '')}`}
                                                 className="flex items-start gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity"
                                             >
@@ -217,7 +217,7 @@ export default function EventsPage() {
                                                         {formatDate(meeting.uploadTime)} · {formatTime(meeting.uploadTime)}
                                                     </CardDescription>
                                                 </div>
-                                            </Link>
+                                            </AppLink>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                                     <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 relative z-10">
@@ -226,12 +226,12 @@ export default function EventsPage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/projects/detail?id=${encodeURIComponent(meeting.project_id || meeting.projectName)}`}>View Project</Link>
+                                                        <AppLink href={`/projects/detail?id=${encodeURIComponent(meeting.project_id || meeting.projectName)}`}>View Project</AppLink>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/events/detail?id=${encodedDocName}&projectName=${encodeURIComponent(meeting.project_id || meeting.projectName)}&displayName=${encodeURIComponent(meeting.projectDisplayName || '')}`}>
+                                                        <AppLink href={`/events/detail?id=${encodedDocName}&projectName=${encodeURIComponent(meeting.project_id || meeting.projectName)}&displayName=${encodeURIComponent(meeting.projectDisplayName || '')}`}>
                                                             View Transcript
-                                                        </Link>
+                                                        </AppLink>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         onClick={() => {

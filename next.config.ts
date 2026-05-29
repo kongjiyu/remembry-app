@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   turbopack: {},
   output: "export",
+  trailingSlash: true,
   images: { unoptimized: true },
 };
 

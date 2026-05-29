@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/apiFetch";
 import { normalizeMeeting, buildProjectMap, type NormalizedMeeting } from "@/lib/meetingViews";
 import { UploadJobsBanner } from "@/components/ui/upload-jobs-banner";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/app-link";
+import { navigateTo } from "@/lib/navigation";
 import {
     Mic, FileText, CheckCircle2, Upload,
     FolderKanban, Plus,
@@ -46,7 +46,6 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [dashboardQuestion, setDashboardQuestion] = useState("");
     const [selectedAskProjectId, setSelectedAskProjectId] = useState<string>("");
-    const router = useRouter();
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -96,7 +95,7 @@ export default function DashboardPage() {
             displayName: selectedProject.display_name,
             question: dashboardQuestion.trim(),
         });
-        router.push(`/ask?${params.toString()}`);
+        navigateTo(`/ask?${params.toString()}`);
     };
 
     const projectMeetingCounts = new Map<string, number>();
@@ -114,6 +113,10 @@ export default function DashboardPage() {
         .slice(0, 5);
 
     const recentProjectsList = projects.slice(0, 3);
+
+    const hasProjects = projects.length > 0;
+    const askInputId = "dashboard-ask-input";
+    const askHelperId = "dashboard-ask-helper";
 
     return (
         <DashboardLayout breadcrumbs={[{ label: "Dashboard" }]} title="Overview">
@@ -140,7 +143,7 @@ export default function DashboardPage() {
                         </CardHeader>
                         <CardContent className="relative z-10 space-y-4">
                             <div className="space-y-3">
-                                {projects.length > 0 ? (
+                                {hasProjects ? (
                                     <select
                                         value={selectedAskProjectId}
                                         onChange={e => setSelectedAskProjectId(e.target.value)}
@@ -153,11 +156,12 @@ export default function DashboardPage() {
                                 ) : (
                                     <p className="text-sm text-muted-foreground">Create a project before asking Remembry.</p>
                                 )}
-                                <div className="relative max-w-xl">
+                                <div className={`relative max-w-xl${!hasProjects ? ' cursor-not-allowed' : ''}`}>
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-5" />
                                     <Input
+                                        id={askInputId}
                                         className="pl-10 h-12 bg-background/50 backdrop-blur-sm border-primary/20 focus-visible:ring-primary/30 text-base shadow-sm rounded-xl"
-                                        placeholder="Ask Remembry: &quot;What did we decide about the roadmap?&quot;"
+                                        placeholder={hasProjects ? "Ask Remembry: \"What did we decide about the roadmap?\"" : "Create a project to ask Remembry"}
                                         value={dashboardQuestion}
                                         onChange={e => setDashboardQuestion(e.target.value)}
                                         onKeyDown={e => {
@@ -166,20 +170,28 @@ export default function DashboardPage() {
                                                 handleAskSubmit();
                                             }
                                         }}
-                                        disabled={projects.length === 0}
+                                        disabled={!hasProjects}
+                                        aria-describedby={!hasProjects ? askHelperId : undefined}
                                     />
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                    <div className={`absolute right-2 top-1/2 -translate-y-1/2${!hasProjects ? ' cursor-not-allowed' : ''}`}>
                                         <Button
                                             size="sm"
                                             variant="ghost"
                                             className="h-8 w-8 p-0 rounded-lg"
                                             onClick={handleAskSubmit}
-                                            disabled={!dashboardQuestion.trim() || !selectedAskProjectId || projects.length === 0}
+                                            disabled={!dashboardQuestion.trim() || !selectedAskProjectId || !hasProjects}
                                         >
                                             <ArrowRight className="size-4" />
                                         </Button>
                                     </div>
                                 </div>
+                                {!hasProjects && (
+                                    <p id={askHelperId} className="text-sm text-muted-foreground flex items-center gap-2">
+                                        <span>Ask Remembry needs a project first.</span>
+                                        <AppLink href="/projects/new" className="text-primary hover:underline font-medium">Create project</AppLink>
+                                        <span>, then add events to search.</span>
+                                    </p>
+                                )}
                             </div>
                             <div className="flex items-center gap-4 pt-2">
                                 <Button
@@ -187,12 +199,12 @@ export default function DashboardPage() {
                                     className="gap-3 h-12 px-6 shadow-lg shadow-primary/25 rounded-xl font-medium"
                                     asChild
                                 >
-                                    <Link href="/events/new?mode=record">
+                                    <AppLink href="/events/new?mode=record">
                                         <div className="flex items-center justify-center size-8 rounded-full bg-white/20">
                                             <Mic className="size-5" />
                                         </div>
                                         Quick Record
-                                    </Link>
+                                    </AppLink>
                                 </Button>
                                 <span className="text-sm text-muted-foreground">Start capturing instantly</span>
                             </div>
@@ -207,7 +219,7 @@ export default function DashboardPage() {
                              ))
                         ) : recentProjectsList.length > 0 ? (
                             recentProjectsList.map((project) => (
-                                <Link key={project.id} href={`/projects/detail?id=${encodeURIComponent(project.id)}`}>
+                                <AppLink key={project.id} href={`/projects/detail?id=${encodeURIComponent(project.id)}`}>
                                     <Card className="h-full hover:bg-muted/50 transition-all duration-300 hover:scale-[1.02] border border-border/50 shadow-sm bg-card/50 backdrop-blur-sm cursor-pointer group">
                                         <CardContent className="p-5 flex flex-col justify-between h-full">
                                             <div className="flex justify-between items-start">
@@ -224,16 +236,16 @@ export default function DashboardPage() {
                                             </div>
                                         </CardContent>
                                     </Card>
-                                </Link>
+                                </AppLink>
                             ))
                         ) : (
                             <div className="col-span-3 flex items-center justify-center h-32 border border-dashed rounded-2xl border-muted">
-                                <Link href="/projects/new" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
+                                <AppLink href="/projects/new" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
                                     <Plus className="size-4" /> Create first project
-                                </Link>
+                                </AppLink>
                             </div>
                         )}
-                        <Link href="/projects/new">
+                        <AppLink href="/projects/new">
                             <Card className="h-full hover:bg-muted/50 transition-all duration-300 hover:scale-[1.02] border border-dashed border-border/50 hover:border-primary/50 bg-card/30 backdrop-blur-sm cursor-pointer group shadow-sm">
                                 <CardContent className="p-5 flex flex-col items-center justify-center h-full gap-3 min-w-0">
                                     <div className="size-11 rounded-full bg-muted flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all duration-300 flex-shrink-0">
@@ -245,28 +257,28 @@ export default function DashboardPage() {
                                     </div>
                                 </CardContent>
                             </Card>
-                        </Link>
+                        </AppLink>
                     </div>
                 </div>
 
                 {/* STATS & ACTIONS COLUMN */}
                 <div className="col-span-1 md:col-span-4 flex flex-col gap-6">
                     <div className="grid grid-cols-2 gap-4">
-                        <Link href="/events/new" className="col-span-2">
-                            <Button size="lg" className="w-full h-14 text-lg font-medium shadow-md shadow-primary/20 rounded-xl">
+                        <Button size="lg" className="col-span-2 w-full h-14 text-lg font-medium shadow-md shadow-primary/20 rounded-xl" asChild>
+                            <AppLink href="/events/new">
                                 <Upload className="mr-2 size-5" /> Upload
-                            </Button>
-                        </Link>
-                        <Link href="/events">
-                            <Button variant="outline" size="lg" className="w-full h-12 rounded-xl bg-card/50 backdrop-blur-sm">
+                            </AppLink>
+                        </Button>
+                        <Button variant="outline" size="lg" className="w-full h-12 rounded-xl bg-card/50 backdrop-blur-sm" asChild>
+                            <AppLink href="/events">
                                 <Mic className="mr-2 size-4" /> Events
-                            </Button>
-                        </Link>
-                        <Link href="/projects">
-                            <Button variant="outline" size="lg" className="w-full h-12 rounded-xl bg-card/50 backdrop-blur-sm">
+                            </AppLink>
+                        </Button>
+                        <Button variant="outline" size="lg" className="w-full h-12 rounded-xl bg-card/50 backdrop-blur-sm" asChild>
+                            <AppLink href="/projects">
                                 <FolderKanban className="mr-2 size-4" /> Projects
-                            </Button>
-                        </Link>
+                            </AppLink>
+                        </Button>
                     </div>
 
                     <Card className="flex-1 border-none shadow-sm bg-card/50 backdrop-blur-xl">
@@ -305,7 +317,7 @@ export default function DashboardPage() {
                                 <CardDescription>Your latest event notes and insights</CardDescription>
                             </div>
                             <Button variant="ghost" size="sm" asChild>
-                                <Link href="/events" className="text-muted-foreground hover:text-primary">View All</Link>
+                                <AppLink href="/events" className="text-muted-foreground hover:text-primary">View All</AppLink>
                             </Button>
                         </CardHeader>
                         <CardContent>
@@ -321,7 +333,7 @@ export default function DashboardPage() {
                                     </div>
                                 ) : (
                                     recentMeetingsList.map((meeting) => (
-                                        <Link
+                                        <AppLink
                                             key={meeting.id}
                                             href={`/events/detail?id=${encodeURIComponent(meeting.id)}&projectName=${encodeURIComponent(meeting.project_id)}&displayName=${encodeURIComponent(meeting.projectDisplayName || '')}`}
                                             className="group flex items-center justify-between p-4 rounded-xl hover:bg-muted/50 transition-all duration-200 border border-transparent hover:border-border/50 min-w-0"
@@ -347,7 +359,7 @@ export default function DashboardPage() {
                                             <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 group-hover:bg-emerald-500/10 transition-colors flex-shrink-0">
                                                 Processed
                                             </Badge>
-                                        </Link>
+                                        </AppLink>
                                     ))
                                 )}
                             </div>
