@@ -39,5 +39,10 @@ regex = "1"
 # OS credential store
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
 
+# Tauri plugins
+tauri-plugin-updater = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+
 [dev-dependencies]
 tempfile = "3"

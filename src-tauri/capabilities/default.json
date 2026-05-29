@@ -4,6 +4,14 @@
   "description": "Default capabilities for Remembry",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "opener:default",
+    "opener:allow-open-url",
+    "process:default",
+    "process:allow-restart",
+    "process:allow-exit",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
   ]
 }

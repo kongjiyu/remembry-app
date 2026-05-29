@@ -7,6 +7,9 @@ mod uploads;
 pub mod commands;
 
 use tauri::Manager;
+use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_process::ProcessExt;
 
 #[tauri::command]
 fn get_app_temp_dir(app: tauri::AppHandle) -> Result<String, String> {
@@ -177,6 +180,9 @@ pub fn run() {
     log::info!("Starting Remembry desktop application");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_app_temp_dir,
             get_app_data_dir,

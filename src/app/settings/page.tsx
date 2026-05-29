@@ -4,12 +4,19 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Palette, Moon, Sun, Monitor, KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink, Copy, Trash2, Eye, EyeOff } from "lucide-react";
+import { Palette, Moon, Sun, Monitor, KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink, Copy, Trash2, Eye, EyeOff, RefreshCw, Download } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { invoke } from "@tauri-apps/api/core";
+import {
+    subscribeToUpdates,
+    checkForUpdates,
+    downloadAndInstall,
+    getCurrentStatus,
+    type UpdateStatus,
+} from "@/lib/appUpdater";
 
 interface ApiKeyStatus {
     hasKey: boolean;
@@ -52,9 +59,21 @@ export default function SettingsPage() {
     const [isLoadingKeyStatus, setIsLoadingKeyStatus] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showApiKey, setShowApiKey] = useState(false);
+    const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+    const [updateInfo, setUpdateInfo] = useState<{ version: string; notes?: string } | null>(null);
+    const [updateProgress, setUpdateProgress] = useState(0);
 
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    // Subscribe to update status
+    useEffect(() => {
+        const unsub = subscribeToUpdates((status, info) => {
+            setUpdateStatus(status);
+            setUpdateInfo(info ?? null);
+        });
+        return unsub;
     }, []);
 
     useEffect(() => {
@@ -155,6 +174,84 @@ export default function SettingsPage() {
     return (
         <DashboardLayout breadcrumbs={[{ label: "Settings" }]} title="Settings">
             <div className="max-w-3xl space-y-6">
+                {/* App Updates */}
+                <Card className="border-none shadow-sm bg-card/50 backdrop-blur-xl">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                <RefreshCw className="size-5" />
+                            </div>
+                            <div>
+                                <CardTitle>App Updates</CardTitle>
+                                <CardDescription>Keep Remembry up to date</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm">
+                                <span className="text-muted-foreground">Current version: </span>
+                                <span className="font-medium">v0.2.0</span>
+                            </div>
+                            {updateStatus === "available" && updateInfo && (
+                                <Badge variant="default" className="bg-primary">New version available</Badge>
+                            )}
+                            {updateStatus === "upToDate" && (
+                                <Badge variant="secondary" className="flex items-center gap-1">
+                                    <CheckCircle2 className="size-3" /> Up to date
+                                </Badge>
+                            )}
+                            {updateStatus === "error" && (
+                                <Badge variant="destructive" className="flex items-center gap-1">
+                                    <AlertCircle className="size-3" /> Error
+                                </Badge>
+                            )}
+                        </div>
+                        {updateStatus === "available" && updateInfo?.notes && (
+                            <div className="p-3 rounded-lg bg-muted/50 border text-sm text-muted-foreground max-h-32 overflow-y-auto">
+                                {updateInfo.notes}
+                            </div>
+                        )}
+                        {updateStatus === "downloading" && (
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Downloading...</span>
+                                    <span className="font-medium">{updateProgress}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                    <div className="h-full bg-primary transition-all" style={{ width: `${updateProgress}%` }} />
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => checkForUpdates()}
+                                disabled={updateStatus === "checking" || updateStatus === "downloading" || updateStatus === "installing"}
+                            >
+                                {updateStatus === "checking" ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="size-4" />
+                                )}
+                                Check for updates
+                            </Button>
+                            {updateStatus === "available" && (
+                                <Button
+                                    size="sm"
+                                    className="gap-2"
+                                    onClick={() => downloadAndInstall((p) => setUpdateProgress(p))}
+                                >
+                                    <Download className="size-4" />
+                                    Update Now
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Appearance / Preferences */}
                 <Card className="border-none shadow-sm bg-card/50 backdrop-blur-xl">
                     <CardHeader>

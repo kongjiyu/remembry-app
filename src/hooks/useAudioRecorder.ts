@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { open } from "@tauri-apps/plugin-opener";
 
 export interface AudioRecorderState {
     isRecording: boolean;
@@ -92,7 +93,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
             setHasPermission(false);
             if (err instanceof Error) {
                 if (err.name === "NotAllowedError") {
-                    setError("Microphone access was denied. Please allow microphone access in your browser settings.");
+                    setError("Microphone access is blocked for Remembry. Enable microphone permission in your system settings, then try again.");
                 } else if (err.name === "NotFoundError") {
                     setError("No microphone found. Please connect a microphone and try again.");
                 } else {
@@ -198,7 +199,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
             setHasPermission(false);
             if (err instanceof Error) {
                 if (err.name === "NotAllowedError") {
-                    setError("Microphone access was denied. Please allow microphone access.");
+                    setError("Microphone access is blocked for Remembry. Enable microphone permission in your system settings, then try again.");
                 } else if (err.name === "NotFoundError") {
                     setError("No microphone found. Please connect a microphone.");
                 } else {
@@ -260,6 +261,18 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         chunksRef.current = [];
     }, [isRecording, stopRecording, audioUrl]);
 
+    const openSystemMicrophoneSettings = useCallback(async () => {
+        const macOSUrl = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
+        const windowsUrl = "ms-settings:privacy-microphone";
+        const ua = navigator.userAgent.toLowerCase();
+        const url = ua.includes("win") ? windowsUrl : macOSUrl;
+        try {
+            await open(url);
+        } catch {
+            // fallback: show instructions in next error display
+        }
+    }, []);
+
     return {
         isRecording,
         isPaused,
@@ -275,5 +288,6 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         resumeRecording,
         resetRecording,
         requestPermission,
+        openSystemMicrophoneSettings,
     };
 }

@@ -5,7 +5,7 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AudioVisualizer } from "@/components/ui/audio-visualizer";
-import { Mic, Square, Pause, Play, RotateCcw, AlertCircle } from "lucide-react";
+import { Mic, Square, Pause, Play, RotateCcw, AlertCircle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AudioRecorderProps {
@@ -37,6 +37,7 @@ export function AudioRecorder({ onRecordingComplete, autoStart, className, onUns
         resumeRecording,
         resetRecording,
         requestPermission,
+        openSystemMicrophoneSettings,
     } = useAudioRecorder();
 
     const autoStartRef = useRef<boolean | undefined>(undefined);
@@ -99,14 +100,20 @@ export function AudioRecorder({ onRecordingComplete, autoStart, className, onUns
                     <div className="flex size-20 items-center justify-center rounded-full bg-destructive/10 mb-6">
                         <AlertCircle className="size-10 text-destructive" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">Microphone Access Required</h3>
+                    <h3 className="text-lg font-semibold mb-2">Microphone Permission Required</h3>
                     <p className="text-muted-foreground text-center max-w-sm mb-6">
-                        {error || "Please allow microphone access in your browser settings to record meetings."}
+                        {error || "Microphone access is blocked for Remembry. Enable microphone permission in your system settings."}
                     </p>
-                    <Button onClick={requestPermission} variant="outline" className="gap-2">
-                        <RotateCcw className="size-4" />
-                        Try Again
-                    </Button>
+                    <div className="flex gap-3">
+                        <Button onClick={openSystemMicrophoneSettings} variant="outline" className="gap-2">
+                            <Settings className="size-4" />
+                            Open Microphone Settings
+                        </Button>
+                        <Button onClick={requestPermission} variant="outline" className="gap-2">
+                            <RotateCcw className="size-4" />
+                            Try Again
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
         );

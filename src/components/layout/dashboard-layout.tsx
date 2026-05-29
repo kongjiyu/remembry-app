@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +12,8 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { checkForUpdates, subscribeToUpdates } from "@/lib/appUpdater";
+import { toast } from "sonner";
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -19,6 +22,19 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, breadcrumbs = [], title }: DashboardLayoutProps) {
+    useEffect(() => {
+        const unsub = subscribeToUpdates((status, info) => {
+            if (status === "available" && info) {
+                toast.success(`Remembry ${info.version} is available`, {
+                    description: "Click to update",
+                    action: { label: "Update", onClick: () => import("@/lib/appUpdater").then(m => m.downloadAndInstall()) },
+                });
+            }
+        });
+        checkForUpdates();
+        return unsub;
+    }, []);
+
     return (
         <SidebarProvider>
             <AppSidebar />
