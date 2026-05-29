@@ -72,36 +72,39 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
+      - name: Import Developer ID certificate
+        run: |
+          echo "${{ secrets.DEVELOPER_ID_CERT }}" | base64 -d > cert.p12
+          security import cert.p12 -k ~/Library/Keychains/login.keychain-db -P "${{ secrets.DEVELOPER_ID_PASSWORD }}" -T /usr/bin/codesign -T /usr/bin/productsign || true
+          security list-keychain
+          security find-cert -c "D579YXN546" || echo "Certificate not found"
+          rm cert.p12
+
       - name: Install frontend dependencies
         run: npm ci
 
       - name: Build Tauri (DMG)
         run: npm run tauri:build
 
-      - name: Find and codesign the app bundle
+      - name: Find and sign the app bundle
         id: find-app
         run: |
           APP_PATH=$(find src-tauri/target/release/bundle -name "*.app" -type d 2>/dev/null | head -1)
           echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
           echo "Found app at: $APP_PATH"
-
-      - name: Ad-hoc sign the app bundle
-        if: steps.find-app.outputs.app_path != ''
-        run: |
-          if [ -n "{{ steps.find-app.outputs.app_path }}" ]; then
-            echo "Ad-hoc signing: {{ steps.find-app.outputs.app_path }}"
-            codesign -s - --force --deep --preserve=identifier -f "{{ steps.find-app.outputs.app_path }}"
+          if [ -n "$APP_PATH" ]; then
+            echo "Signing with Developer ID..."
+            codesign -s "Developer ID Application: Ji Yu Kong (D579YXN546)" --force --deep --preserve=identifier -f "$APP_PATH"
           fi
 
       - name: Rebuild DMG with signed app
-        if: steps.find-app.outputs.app_path != ''
         run: |
-          APP_DIR=$(dirname "{{ steps.find-app.outputs.app_path }}")
+          APP_DIR=$(dirname "$APP_PATH")
           create-dmg \
             --identifier "com.remembry.app" \
             --overwrite \
             --output "$APP_DIR" \
-            "{{ steps.find-app.outputs.app_path }}"
+            "$APP_PATH"
 
       - name: Strip quarantine from DMG
         run: |
