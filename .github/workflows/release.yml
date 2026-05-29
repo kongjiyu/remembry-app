@@ -75,11 +75,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Clear icon cache
-        run: |
-          rm -rf src-tauri/icons
-          rm -rf ~/Library/Caches/cargo-tauri/icons 2>/dev/null || true
-
       - name: Build Tauri (DMG)
         run: npm run tauri:build
 
