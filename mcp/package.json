@@ -1,6 +1,6 @@
 {
   "name": "@cstan0824/remembry-mcp",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Remembry MCP Server — manage your meeting knowledge base via AI assistants. Recording requires the Remembry desktop app to be running.",
   "type": "module",
   "main": "dist/index.js",
