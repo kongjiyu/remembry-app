@@ -199,7 +199,7 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          cd mcp && npm version "$VERSION" --no-git-tag-version
+          cd mcp && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
         run: cd mcp && npm publish --access public
