@@ -19,7 +19,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install Rust toolchain
@@ -29,7 +29,7 @@ jobs:
           targets: x86_64-pc-windows-msvc
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Tauri (NSIS + MSI)
         run: npm run tauri:build
@@ -110,7 +110,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install Rust toolchain
@@ -130,7 +130,7 @@ jobs:
           rm cert.p12
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Tauri (DMG)
         run: npm run tauri:build
@@ -184,12 +184,12 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install MCP dependencies
-        run: cd mcp && npm ci
+        run: cd mcp && npm install
 
       - name: Build MCP server
         run: cd mcp && npm run build
