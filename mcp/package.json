@@ -1,16 +1,40 @@
 {
-  "name": "remembry-mcp",
-  "version": "0.1.0",
-  "description": "Remembry MCP Server — read-only access to your meeting knowledge base",
+  "name": "@cstan0824/remembry-mcp",
+  "version": "0.3.1",
+  "description": "Remembry MCP Server — manage your meeting knowledge base via AI assistants. Recording requires the Remembry desktop app to be running.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "remembry-mcp": "dist/index.js"
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "remembry",
+    "meeting",
+    "knowledge-base",
+    "transcription",
+    "ai",
+    "notes",
+    "action-items"
+  ],
+  "author": "kongjiyu",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kongjiyu/remembry-app.git",
+    "directory": "mcp"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

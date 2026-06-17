@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { AudioRecorder } from "@/components/ui/audio-recorder";
+import { AudioRecorder, AudioRecorderHandle } from "@/components/ui/audio-recorder";
+import { useRecordingBridge } from "@/hooks/useRecordingBridge";
 import { Upload, Mic, FileAudio, FileText, X, Loader2, FolderKanban, Plus, Download, Tag, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeMeeting, countMeetingsByProject } from "@/lib/meetingViews";
@@ -160,6 +161,9 @@ export default function NewEventPage() {
     const [pendingMode, setPendingMode] = useState<InputMode | null>(null);
     const [hasUnsavedRecording, setHasUnsavedRecording] = useState(false);
 
+    // Ref for AudioRecorder (exposes start/stop for Tauri event bridge)
+    const audioRecorderRef = useRef<AudioRecorderHandle>(null);
+
     // Create project dialog
     const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
@@ -293,6 +297,19 @@ export default function NewEventPage() {
             mimeType: blob.type || "audio/webm",
         });
     };
+
+    // Tauri event bridge — listens for start-record/stop-record from HTTP API
+    useRecordingBridge({
+        startRecording: async () => {
+            await audioRecorderRef.current?.startRecording();
+        },
+        stopRecording: () => {
+            audioRecorderRef.current?.stopRecording();
+        },
+        isRecording: audioRecorderRef.current?.isRecording ?? false,
+        hasPermission: audioRecorderRef.current?.hasPermission ?? null,
+        onRecordingComplete: handleRecordingComplete,
+    });
 
     const handleRemoveFile = () => {
         if (uploadedFile?.url) {
@@ -593,7 +610,7 @@ export default function NewEventPage() {
                                 </label>
                             </div>
                         ) : (
-                            <AudioRecorder onRecordingComplete={handleRecordingComplete} autoStart={shouldAutoStart} onUnsavedRecordingChange={setHasUnsavedRecording} />
+                            <AudioRecorder ref={audioRecorderRef} onRecordingComplete={handleRecordingComplete} autoStart={shouldAutoStart} onUnsavedRecordingChange={setHasUnsavedRecording} />
                         )}
                     </CardContent>
                 </Card>

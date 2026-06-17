@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AudioVisualizer } from "@/components/ui/audio-visualizer";
 import { Mic, Square, Pause, Play, RotateCcw, AlertCircle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export interface AudioRecorderHandle {
+    startRecording: () => Promise<void>;
+    stopRecording: () => void;
+    isRecording: boolean;
+    hasPermission: boolean | null;
+}
 
 interface AudioRecorderProps {
     onRecordingComplete?: (blob: Blob, duration: number) => void;
@@ -21,7 +28,10 @@ function formatDuration(seconds: number): string {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
-export function AudioRecorder({ onRecordingComplete, autoStart, className, onUnsavedRecordingChange }: AudioRecorderProps) {
+export const AudioRecorder = forwardRef<AudioRecorderHandle, AudioRecorderProps>(function AudioRecorder(
+    { onRecordingComplete, autoStart, className, onUnsavedRecordingChange },
+    ref
+) {
     const {
         isRecording,
         isPaused,
@@ -39,6 +49,14 @@ export function AudioRecorder({ onRecordingComplete, autoStart, className, onUns
         requestPermission,
         openSystemMicrophoneSettings,
     } = useAudioRecorder();
+
+    // Expose recording methods to parent via ref (for Tauri event bridge)
+    useImperativeHandle(ref, () => ({
+        startRecording,
+        stopRecording,
+        isRecording,
+        hasPermission,
+    }), [startRecording, stopRecording, isRecording, hasPermission]);
 
     const autoStartRef = useRef<boolean | undefined>(undefined);
     if (autoStartRef.current === undefined) {
@@ -251,4 +269,4 @@ export function AudioRecorder({ onRecordingComplete, autoStart, className, onUns
             </CardContent>
         </Card>
     );
-}
+});

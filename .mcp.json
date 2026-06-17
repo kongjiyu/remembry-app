@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "remembry": {
+      "command": "npx",
+      "args": ["-y", "@cstan0824/remembry-mcp"]
+    }
+  }
+}
