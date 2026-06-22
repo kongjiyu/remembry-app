@@ -243,8 +243,11 @@ pub fn run() {
             let api_state = Arc::new(api::ApiState {
                 app: api_app,
                 last_request: Arc::new(tokio::sync::Mutex::new(std::time::Instant::now())),
+                recording: Arc::new(tokio::sync::Mutex::new(None)),
             });
             let router = api::create_router(api_state.clone());
+            // Register ApiState so Tauri commands can retrieve it via app.state::<Arc<ApiState>>().
+            app.manage(api_state.clone());
             let addr = std::net::SocketAddr::from(([127, 0, 0, 1], api::API_PORT));
 
             tauri::async_runtime::spawn(async move {
