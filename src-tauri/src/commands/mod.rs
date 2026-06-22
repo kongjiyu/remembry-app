@@ -10,6 +10,7 @@ pub mod events;
 pub mod ask;
 pub mod recording;
 pub mod audio;
+pub mod documents;
 
 #[cfg(test)]
 pub mod tests;

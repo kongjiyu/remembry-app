@@ -222,6 +222,12 @@ pub fn run() {
             commands::recording::stop_recording_session,
             commands::recording::get_recording_state,
             commands::audio::save_audio_blob,
+            commands::documents::list_documents,
+            commands::documents::get_document,
+            commands::documents::create_document,
+            commands::documents::update_document,
+            commands::documents::delete_document,
+            commands::documents::import_text_file,
         ])
         .setup(|app| {
             // Initialize database
