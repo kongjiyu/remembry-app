@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Mic, Upload, Search, MoreVertical, Clock, CheckCircle2, Loader2, AlertCircle, FolderKanban, Trash2, Download } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useRouter } from "next/navigation";
 import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 import { normalizeMeeting, buildProjectMap, formatMimeBadgeLabel, type NormalizedMeeting } from "@/lib/meetingViews";
@@ -72,6 +74,7 @@ interface FailedJob {
 }
 
 export default function EventsPage() {
+    const router = useRouter();
     const [meetings, setMeetings] = useState<NormalizedMeeting[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -247,7 +250,7 @@ export default function EventsPage() {
                                         <p className="text-sm text-muted-foreground">{job.error}</p>
                                     </div>
                                     {job.temp_path && (
-                                        <Button variant="ghost" size="icon" onClick={() => handleDownloadFailed(job)}>
+                                        <Button variant="ghost" size="icon" onClick={() => handleDownloadFailed(job)} aria-label="Download audio">
                                             <Download className="size-4" />
                                         </Button>
                                     )}
@@ -265,30 +268,34 @@ export default function EventsPage() {
                     </div>
                 ) : filteredMeetings.length === 0 ? (
                     /* Empty State */
-                    <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="flex size-16 items-center justify-center rounded-full bg-muted mb-4">
-                                <Mic className="size-8 text-muted-foreground" />
-                            </div>
-                            <h3 className="text-lg font-medium mb-2">
-                                {searchQuery ? "No events found" : "No events yet"}
-                            </h3>
-                            <p className="text-muted-foreground text-center max-w-sm mb-4">
-                                {searchQuery
-                                    ? "Try adjusting your search query"
-                                    : "Upload your first recording to get started with AI-powered transcription and knowledge extraction."
-                                }
-                            </p>
-                            {!searchQuery && (
-                                <Button asChild>
-                                    <AppLink href="/events/new">
-                                        <Upload className="size-4 mr-2" />
-                                        Upload Recording
-                                    </AppLink>
-                                </Button>
-                            )}
-                        </CardContent>
-                    </Card>
+                    searchQuery ? (
+                        <Card className="border-dashed">
+                            <CardContent className="flex flex-col items-center justify-center py-16">
+                                <div className="flex size-16 items-center justify-center rounded-full bg-muted mb-4">
+                                    <Search className="size-8 text-muted-foreground" />
+                                </div>
+                                <h3 className="text-lg font-medium mb-2">No events found</h3>
+                                <p className="text-muted-foreground text-center max-w-sm">Try adjusting your search query</p>
+                            </CardContent>
+                        </Card>
+                    ) : statusFilter === "all" && meetings.length === 0 ? (
+                        <EmptyState
+                            icon={Mic}
+                            title="No events yet"
+                            description="Upload your first recording to get started with AI-powered transcription."
+                            action={{ label: "New Event", onClick: () => router.push("/events/new") }}
+                        />
+                    ) : (
+                        <Card className="border-dashed">
+                            <CardContent className="flex flex-col items-center justify-center py-16">
+                                <div className="flex size-16 items-center justify-center rounded-full bg-muted mb-4">
+                                    <Search className="size-8 text-muted-foreground" />
+                                </div>
+                                <h3 className="text-lg font-medium mb-2">No events found</h3>
+                                <p className="text-muted-foreground text-center max-w-sm">Try adjusting your search query</p>
+                            </CardContent>
+                        </Card>
+                    )
                 ) : (
                     /* Events Grid */
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

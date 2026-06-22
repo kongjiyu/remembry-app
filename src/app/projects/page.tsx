@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { FolderKanban, Plus, Search, MoreVertical, Mic, CheckCircle2, Trash2, Loader2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useRouter } from "next/navigation";
 import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 import { normalizeMeeting, buildProjectMap, countMeetingsByProject, type NormalizedMeeting } from "@/lib/meetingViews";
@@ -35,6 +37,7 @@ interface Project {
 }
 
 export default function ProjectsPage() {
+    const router = useRouter();
     const [projects, setProjects] = useState<Project[]>([]);
     const [meetings, setEvents] = useState<NormalizedMeeting[]>([]);
     const [loading, setLoading] = useState(true);
@@ -204,28 +207,30 @@ export default function ProjectsPage() {
                         <p className="text-muted-foreground">Loading projects...</p>
                     </div>
                 ) : filteredProjects.length === 0 ? (
-                    <Card className="py-12">
-                        <CardContent className="text-center">
-                            <FolderKanban className="size-12 text-muted-foreground mx-auto mb-4" />
-                            <h3 className="text-lg font-semibold mb-2">
-                                {searchQuery ? "No projects found" : "No projects yet"}
-                            </h3>
-                            <p className="text-muted-foreground mb-4">
-                                {searchQuery
-                                    ? "Try adjusting your search query"
-                                    : "Create your first project to get started"
-                                }
-                            </p>
-                            {!searchQuery && (
-                                <Button asChild>
-                                    <AppLink href="/projects/new">
-                                        <Plus className="size-4 mr-2" />
-                                        Create Project
-                                    </AppLink>
-                                </Button>
-                            )}
-                        </CardContent>
-                    </Card>
+                    searchQuery ? (
+                        <Card className="py-12">
+                            <CardContent className="text-center">
+                                <Search className="size-12 text-muted-foreground mx-auto mb-4" />
+                                <h3 className="text-lg font-semibold mb-2">No projects found</h3>
+                                <p className="text-muted-foreground">Try adjusting your search query</p>
+                            </CardContent>
+                        </Card>
+                    ) : projects.length === 0 ? (
+                        <EmptyState
+                            icon={FolderKanban}
+                            title="No projects yet"
+                            description="Create your first project to start capturing knowledge."
+                            action={{ label: "New Project", onClick: () => router.push("/projects/new") }}
+                        />
+                    ) : (
+                        <Card className="py-12">
+                            <CardContent className="text-center">
+                                <Search className="size-12 text-muted-foreground mx-auto mb-4" />
+                                <h3 className="text-lg font-semibold mb-2">No projects found</h3>
+                                <p className="text-muted-foreground">Try adjusting your search query</p>
+                            </CardContent>
+                        </Card>
+                    )
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {filteredProjects.map((project) => {
