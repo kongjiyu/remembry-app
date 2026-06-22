@@ -15,13 +15,19 @@ function formatElapsed(ms: number): string {
 
 export function RecordingToast() {
     const rec = useRecording();
-    const [now, setNow] = React.useState(Date.now());
+    const [nowMs, setNowMs] = React.useState(0);
 
     React.useEffect(() => {
         if (rec.status !== "recording" || !rec.startedAt) return;
-        const id = setInterval(() => setNow(Date.now()), 1000);
+        const update = () => setNowMs(new Date().getTime());
+        update();
+        const id = setInterval(update, 1000);
         return () => clearInterval(id);
     }, [rec.status, rec.startedAt]);
+
+    const elapsedMs = rec.startedAt && rec.status === "recording"
+        ? Math.max(0, nowMs - rec.startedAt)
+        : 0;
 
     React.useEffect(() => {
         if (rec.status === "recording" && rec.title) {
@@ -29,13 +35,13 @@ export function RecordingToast() {
                 (toastId) => (
                     <RecordingCard
                         title={rec.title}
-                        elapsed={rec.startedAt ? formatElapsed(now - rec.startedAt) : "00:00"}
+                        elapsed={rec.startedAt ? formatElapsed(elapsedMs) : "00:00"}
                         onStop={async () => {
                             try {
                                 await rec.stop();
                                 sonnerToast.dismiss(toastId);
                                 sonnerToast.success("Recording stopped");
-                            } catch (err) {
+                            } catch {
                                 sonnerToast.error("Failed to stop recording");
                             }
                         }}
@@ -51,7 +57,10 @@ export function RecordingToast() {
         } else {
             sonnerToast.dismiss("recording-active");
         }
-    }, [rec.status, rec.title, rec.startedAt, now, rec.stop]);
+        // elapsedMs is intentionally excluded — changes to it trigger the interval above
+        // which re-renders and re-invokes this effect via nowMs dependencies.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rec.status, rec.title, rec.startedAt, nowMs, rec.stop]);
 
     return null;
 }

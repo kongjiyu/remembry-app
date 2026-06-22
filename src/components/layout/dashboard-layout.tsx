@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { RecordingToast } from "@/components/layout/recording-toast";
 import { Separator } from "@/components/ui/separator";
 import {
     Breadcrumb,
@@ -37,6 +38,7 @@ export function DashboardLayout({ children, breadcrumbs = [], title }: Dashboard
 
     return (
         <SidebarProvider>
+            <RecordingToast />
             <AppSidebar />
             <SidebarInset className="bg-background">
                 <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-background/80 backdrop-blur-md border-b border-border/40">
