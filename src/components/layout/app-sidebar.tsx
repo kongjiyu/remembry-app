@@ -20,6 +20,7 @@ import {
     Mic,
     Settings,
     FolderKanban,
+    NotebookPen,
 } from "lucide-react";
 
 const navItems = [
@@ -37,6 +38,11 @@ const navItems = [
         title: "Events",
         url: "/events",
         icon: Mic,
+    },
+    {
+        title: "Notes",
+        url: "/notes",
+        icon: NotebookPen,
     },
 ];
 
