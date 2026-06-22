@@ -112,6 +112,10 @@ const TAURI_COMMANDS: TauriCommandEntry[] = [
   { pattern: "/api/settings/gemini-key", method: "GET", command: "get_gemini_key_status", extractParams: () => ({}) },
   { pattern: "/api/settings/gemini-key", method: "POST", command: "save_gemini_key", extractParams: (_, __, body) => ({ apiKey: (body as { apiKey?: string })?.apiKey || "" }) },
   { pattern: "/api/settings/gemini-key", method: "DELETE", command: "delete_gemini_key", extractParams: () => ({}) },
+  { pattern: "/api/audio/download", method: "POST", command: "download_audio", extractParams: (_, __, body) => {
+    const b = body as { sourcePath?: string; suggestedFilename?: string } | null;
+    return { sourcePath: b?.sourcePath || "", suggestedFilename: b?.suggestedFilename || null };
+  }},
   { pattern: "/api/ask", method: "POST", command: "ask_question", extractParams: (_, __, body) => {
     const b = body as { scope?: string; projectId?: string; meetingId?: string; question?: string; language?: string } | null;
     return {
