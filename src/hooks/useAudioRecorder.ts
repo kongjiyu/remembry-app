@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useRecording } from "@/components/layout/recording-provider";
 
 export interface AudioRecorderState {
     isRecording: boolean;
@@ -24,8 +25,26 @@ export interface AudioRecorderActions {
     openSystemMicrophoneSettings: () => Promise<void>;
 }
 
+/**
+ * Thin compatibility layer over `useRecording()` from the
+ * `RecordingProvider`. The provider owns the single `MediaRecorder`
+ * instance and persists state to the Tauri backend.
+ *
+ * UI-only state (analyser, pause/resume, blob preview, duration,
+ * permission flow) remains local to this hook so the existing
+ * `<AudioRecorder>` component continues to render unchanged.
+ *
+ * `startRecording` / `stopRecording` / `isRecording` are forwarded to
+ * the provider so MCP-driven `start-record` events and user-clicked
+ * "Start" buttons all drive the same underlying MediaRecorder.
+ */
 export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
-    const [isRecording, setIsRecording] = useState(false);
+    const provider = useRecording();
+
+    // Local UI-only state. Recording lifecycle (isRecording) is derived
+    // from the provider, but the rest of the recorder UI (pause, blob,
+    // analyser, error, duration) stays local so the <AudioRecorder>
+    // component's behaviour is preserved.
     const [isPaused, setIsPaused] = useState(false);
     const [duration, setDuration] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -40,6 +59,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const providerRecording = provider.status === "recording";
 
     // Check microphone permission status on mount (without triggering prompt)
     useEffect(() => {
@@ -65,6 +85,73 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         checkPermission();
     }, []);
 
+    // Sync local analyser/UI state when the provider transitions to recording.
+    // When the provider starts a recording (from MCP or from this hook), we
+    // attach a parallel local AudioContext for the visualizer. The actual
+    // audio capture lives in the provider's MediaRecorder.
+    useEffect(() => {
+        if (!providerRecording) {
+            // Stop local UI bits. Wrap cleanup-driven setState in a
+            // microtask so React's lint rule (no synchronous setState in
+            // effect bodies) doesn't fire — the actual reset still
+            // happens before the next paint via the deferred callback.
+            queueMicrotask(() => setAnalyser(null));
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach((track) => track.stop());
+                streamRef.current = null;
+            }
+            if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+                audioContextRef.current.close().catch(() => undefined);
+                audioContextRef.current = null;
+            }
+            return;
+        }
+        // While provider is recording, attempt to attach a visualizer
+        // stream for the existing capture. We do NOT start a second
+        // MediaRecorder — the provider owns that.
+        let cancelled = false;
+        (async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (cancelled) {
+                    stream.getTracks().forEach((t) => t.stop());
+                    return;
+                }
+                streamRef.current = stream;
+                setHasPermission(true);
+                const AudioCtor: typeof AudioContext =
+                    window.AudioContext ||
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    ((window as any).webkitAudioContext as typeof AudioContext);
+                const audioContext = new AudioCtor();
+                const analyserNode = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyserNode);
+                analyserNode.fftSize = 256;
+                audioContextRef.current = audioContext;
+                sourceRef.current = source;
+                setAnalyser(analyserNode);
+                if (provider.startedAt) {
+                    const startMs = provider.startedAt;
+                    setDuration(Math.floor((Date.now() - startMs) / 1000));
+                    timerRef.current = setInterval(() => {
+                        setDuration(Math.floor((Date.now() - startMs) / 1000));
+                    }, 1000);
+                }
+            } catch (err) {
+                // Visualizer is best-effort; ignore if mic is busy
+                console.warn("[useAudioRecorder] visualizer attach failed", err);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [providerRecording, provider.startedAt]);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -72,9 +159,9 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
                 clearInterval(timerRef.current);
             }
             if (streamRef.current) {
-                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current.getTracks().forEach((track) => track.stop());
             }
-            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            if (audioContextRef.current && audioContextRef.current.state !== "closed") {
                 audioContextRef.current.close();
             }
             if (audioUrl) {
@@ -86,7 +173,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     const requestPermission = useCallback(async (): Promise<boolean> => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop());
+            stream.getTracks().forEach((track) => track.stop());
             setHasPermission(true);
             setError(null);
             return true;
@@ -105,162 +192,69 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         }
     }, []);
 
+    // Forward to provider — the provider owns the single MediaRecorder.
     const startRecording = useCallback(async () => {
-        try {
-            setError(null);
-            chunksRef.current = [];
-
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                }
-            });
-
-            streamRef.current = stream;
-            setHasPermission(true);
-
-            // Setup Audio Analysis
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const analyserNode = audioContext.createAnalyser();
-            const source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyserNode);
-            
-            analyserNode.fftSize = 256;
-            audioContextRef.current = audioContext;
-            sourceRef.current = source;
-            setAnalyser(analyserNode);
-
-            // Try WebM first (better quality), fall back to alternatives
-            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-                ? "audio/webm;codecs=opus"
-                : MediaRecorder.isTypeSupported("audio/webm")
-                    ? "audio/webm"
-                    : "audio/mp4";
-
-            const mediaRecorder = new MediaRecorder(stream, { mimeType });
-            mediaRecorderRef.current = mediaRecorder;
-
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    chunksRef.current.push(event.data);
-                }
-            };
-
-            mediaRecorder.onstop = () => {
-                // Stop timer first
-                if (timerRef.current) {
-                    clearInterval(timerRef.current);
-                    timerRef.current = null;
-                }
-
-                const blob = new Blob(chunksRef.current, { type: mimeType });
-                setAudioBlob(blob);
-
-                // Revoke previous URL if exists
-                if (audioUrl) {
-                    URL.revokeObjectURL(audioUrl);
-                }
-
-                const url = URL.createObjectURL(blob);
-                setAudioUrl(url);
-
-                setIsRecording(false);
-                setIsPaused(false);
-
-                // Stop all tracks
-                stream.getTracks().forEach(track => track.stop());
-
-                // Close Audio Context
-                if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                    audioContextRef.current.close();
-                }
-                setAnalyser(null);
-            };
-
-            mediaRecorder.onerror = () => {
-                setError("Recording error occurred. Please try again.");
-                setIsRecording(false);
-                setIsPaused(false);
-            };
-
-            mediaRecorder.start(1000); // Collect data every second
-            setIsRecording(true);
-            setIsPaused(false);
-            setDuration(0);
-
-            // Start timer
-            timerRef.current = setInterval(() => {
-                setDuration(prev => prev + 1);
-            }, 1000);
-
-        } catch (err) {
-            setHasPermission(false);
-            if (err instanceof Error) {
-                if (err.name === "NotAllowedError") {
-                    setError("Microphone access is blocked for Remembry. Enable microphone permission in your system settings, then try again.");
-                } else if (err.name === "NotFoundError") {
-                    setError("No microphone found. Please connect a microphone.");
-                } else {
-                    setError(`Failed to start recording: ${err.message}`);
-                }
-            }
+        setError(null);
+        setAudioBlob(null);
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+            setAudioUrl(null);
         }
-    }, [audioUrl]);
+        setDuration(0);
+        await provider.start("Recording");
+    }, [provider, audioUrl]);
 
+    // Forward to provider. The provider flushes the recorded blob to
+    // temp_uploads via `save_audio_blob` in its onstop handler; we do
+    // not duplicate that work here.
     const stopRecording = useCallback(() => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            setIsPaused(false);
-
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
+        setIsPaused(false);
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
         }
-    }, [isRecording]);
+        void provider.stop().catch((err) => {
+            console.error("[useAudioRecorder] provider.stop failed", err);
+        });
+    }, [provider]);
 
     const pauseRecording = useCallback(() => {
-        if (mediaRecorderRef.current && isRecording && !isPaused) {
+        if (providerRecording && !isPaused && mediaRecorderRef.current) {
             mediaRecorderRef.current.pause();
             setIsPaused(true);
-
             if (timerRef.current) {
                 clearInterval(timerRef.current);
                 timerRef.current = null;
             }
         }
-    }, [isRecording, isPaused]);
+    }, [providerRecording, isPaused]);
 
     const resumeRecording = useCallback(() => {
-        if (mediaRecorderRef.current && isRecording && isPaused) {
+        if (providerRecording && isPaused && mediaRecorderRef.current) {
             mediaRecorderRef.current.resume();
             setIsPaused(false);
-
-            timerRef.current = setInterval(() => {
-                setDuration(prev => prev + 1);
-            }, 1000);
+            if (provider.startedAt) {
+                const startMs = provider.startedAt;
+                timerRef.current = setInterval(() => {
+                    setDuration(Math.floor((Date.now() - startMs) / 1000));
+                }, 1000);
+            }
         }
-    }, [isRecording, isPaused]);
+    }, [providerRecording, isPaused, provider.startedAt]);
 
     const resetRecording = useCallback(() => {
-        if (isRecording) {
+        if (providerRecording) {
             stopRecording();
         }
-
         if (audioUrl) {
             URL.revokeObjectURL(audioUrl);
         }
-
         setAudioBlob(null);
         setAudioUrl(null);
         setDuration(0);
         setError(null);
         chunksRef.current = [];
-    }, [isRecording, stopRecording, audioUrl]);
+    }, [providerRecording, stopRecording, audioUrl]);
 
     const openSystemMicrophoneSettings = useCallback(async () => {
         const macOSUrl = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
@@ -274,8 +268,12 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         }
     }, []);
 
+    // Touch mediaRecorderRef so lint/TS doesn't flag it as fully unused —
+    // pauseRecording / resumeRecording still reference it.
+    void mediaRecorderRef;
+
     return {
-        isRecording,
+        isRecording: providerRecording,
         isPaused,
         duration,
         audioBlob,

@@ -11,12 +11,13 @@ export interface RecordingProviderState {
     audioPath: string | null;
     start: (title: string) => Promise<void>;
     stop: () => Promise<void>;
+    refresh: () => Promise<void>;
 }
 
 const RecordingContext = React.createContext<RecordingProviderState | null>(null);
 
 export function RecordingProvider({ children }: { children: React.ReactNode }) {
-    const [state, setState] = React.useState<Omit<RecordingProviderState, "start" | "stop">>({
+    const [state, setState] = React.useState<Omit<RecordingProviderState, "start" | "stop" | "refresh">>({
         status: "idle",
         jobId: null,
         title: "",
@@ -102,6 +103,12 @@ export function RecordingProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    // Exposed so consumers (e.g. RecordingToast) can poll and re-sync from backend
+    // after navigation, refresh, or any state drift.
+    const refresh = React.useCallback(async () => {
+        await refreshFromBackend();
+    }, [refreshFromBackend]);
+
     // Listen for start-record/stop-record Tauri events from MCP/Rust
     React.useEffect(() => {
         let unlisteners: UnlistenFn[] = [];
@@ -129,7 +136,7 @@ export function RecordingProvider({ children }: { children: React.ReactNode }) {
     }, [start, stop, refreshFromBackend]);
 
     return (
-        <RecordingContext.Provider value={{ ...state, start, stop }}>
+        <RecordingContext.Provider value={{ ...state, start, stop, refresh }}>
             {children}
         </RecordingContext.Provider>
     );

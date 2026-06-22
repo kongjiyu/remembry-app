@@ -17,6 +17,24 @@ export function RecordingToast() {
     const rec = useRecording();
     const [nowMs, setNowMs] = React.useState(0);
 
+    // Safety-net polling: every 2s, ask the provider to re-sync from the
+    // Rust backend. Catches state drift after navigation, page refresh,
+    // or any path where the provider state fell out of sync (e.g. an
+    // external HTTP /api/recording/start hit the backend but no Tauri
+    // event fired in the WebView).
+    // We hold refresh in a ref so the interval is only (re)created when
+    // status flips, not on every provider state update.
+    const refreshRef = React.useRef(rec.refresh);
+    React.useEffect(() => {
+        refreshRef.current = rec.refresh;
+    });
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            void refreshRef.current();
+        }, 2000);
+        return () => clearInterval(interval);
+    }, [rec.status]);
+
     React.useEffect(() => {
         if (rec.status !== "recording" || !rec.startedAt) return;
         const update = () => setNowMs(new Date().getTime());

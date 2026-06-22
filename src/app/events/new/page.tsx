@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AudioRecorder, AudioRecorderHandle } from "@/components/ui/audio-recorder";
-import { useRecordingBridge } from "@/hooks/useRecordingBridge";
 import { Upload, Mic, FileAudio, FileText, X, Loader2, FolderKanban, Plus, Download, Tag, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeMeeting, countMeetingsByProject } from "@/lib/meetingViews";
@@ -303,18 +302,10 @@ export default function NewEventPage() {
         });
     };
 
-    // Tauri event bridge — listens for start-record/stop-record from HTTP API
-    useRecordingBridge({
-        startRecording: async () => {
-            await audioRecorderRef.current?.startRecording();
-        },
-        stopRecording: () => {
-            audioRecorderRef.current?.stopRecording();
-        },
-        isRecording: audioRecorderRef.current?.isRecording ?? false,
-        hasPermission: audioRecorderRef.current?.hasPermission ?? null,
-        onRecordingComplete: handleRecordingComplete,
-    });
+    // Tauri start-record / stop-record events are handled by the root-scoped
+    // RecordingProvider (see src/components/layout/recording-provider.tsx).
+    // The provider owns the single MediaRecorder and persists state to the
+    // Rust backend, so no page-local bridge is needed here.
 
     const handleRemoveFile = () => {
         if (uploadedFile?.url) {
