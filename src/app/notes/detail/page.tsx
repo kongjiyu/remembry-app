@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Save, FolderKanban, ArrowLeft, Loader2 } from "lucide-react";
+import { Trash2, Save, FolderKanban, ArrowLeft, Loader2, NotebookPen, Calendar } from "lucide-react";
 import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 import { toast } from "sonner";
@@ -131,19 +131,44 @@ function NoteDetailContent() {
                 </Button>
 
                 <Card>
-                    <CardContent className="p-6 space-y-4">
-                        <div className="flex items-center justify-between gap-4">
-                            <input
-                                value={title}
-                                onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
-                                className="flex-1 bg-transparent text-2xl font-semibold focus:outline-none border-b border-transparent focus:border-border"
-                                placeholder="Note title"
-                            />
-                            <Badge variant="secondary" className="gap-1 shrink-0">
-                                <FolderKanban className="size-3" />
-                                {projectName || "Unknown"}
-                            </Badge>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-start gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                                <NotebookPen className="size-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-2">
+                                <input
+                                    value={title}
+                                    onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
+                                    className="w-full bg-transparent text-xl font-semibold focus:outline-none border-b border-transparent focus:border-border"
+                                    placeholder="Note title"
+                                    aria-label="Note title"
+                                />
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                    <Calendar className="size-3" />
+                                    <span>
+                                        {doc.created_at
+                                            ? new Date(doc.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                                            : "Unknown date"}
+                                    </span>
+                                    <span className="text-muted-foreground">·</span>
+                                    <Badge variant="outline" className="text-xs gap-1">
+                                        <FolderKanban className="size-3" />
+                                        {projectName || "Unknown project"}
+                                    </Badge>
+                                    {doc.mime_type && (
+                                        <>
+                                            <span className="text-muted-foreground">·</span>
+                                            <Badge variant="outline" className="text-xs">
+                                                {doc.mime_type.replace("text/", "")}
+                                            </Badge>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                         <textarea
                             value={content}
                             onChange={(e) => { setContent(e.target.value); setDirty(true); }}

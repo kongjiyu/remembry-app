@@ -25,6 +25,7 @@ import {
     HelpCircle,
     Sparkles,
     Clock,
+    NotebookPen,
 } from "lucide-react";
 import { AppLink } from "@/components/ui/app-link";
 import { navigateTo } from "@/lib/navigation";
@@ -79,6 +80,15 @@ interface Project {
 
 interface ProjectDetail extends Project {
     meetings: Meeting[];
+}
+
+interface ProjectNote {
+    id: string;
+    project_id: string;
+    display_name: string;
+    content: string;
+    mime_type?: string;
+    created_at: string;
 }
 
 function formatDate(dateString?: string) {
@@ -163,6 +173,11 @@ function ProjectDetailContent() {
     const [selectedOverviewMonth, setSelectedOverviewMonth] = useState("all");
     const [expandedTabs, setExpandedTabs] = useState<Record<string, boolean>>({});
     const [showEditDialog, setShowEditDialog] = useState(false);
+    const [notes, setNotes] = useState<ProjectNote[]>([]);
+    const [notesSearchQuery, setNotesSearchQuery] = useState("");
+    const [noteToDelete, setNoteToDelete] = useState<ProjectNote | null>(null);
+    const [showDeleteNoteDialog, setShowDeleteNoteDialog] = useState(false);
+    const [isDeletingNote, setIsDeletingNote] = useState(false);
 
     const availableMonths = useMemo(() => projectOverview ? getAvailableMonths(projectOverview) : [], [projectOverview]);
     const availableMonthValues = useMemo(() => new Set(availableMonths.map(o => o.value)), [availableMonths]);
@@ -219,6 +234,11 @@ function ProjectDetailContent() {
                     default_language: m.default_language || null,
                 }));
 
+                const notesResponse = await apiFetch(`/api/documents?project_id=${encodeURIComponent(projectName)}`);
+                const notesData: ProjectNote[] = notesResponse.ok
+                    ? ((await notesResponse.json()) as ProjectNote[])
+                    : [];
+
                 if (!cancelled) {
                     setProjectOverview(aggregateProjectKnowledge(meetingsForOverview));
                     setProject({
@@ -226,6 +246,7 @@ function ProjectDetailContent() {
                         meetings,
                         meeting_count: meetings.length,
                     });
+                    setNotes(notesData);
                 }
             } catch (error) {
                 if (!cancelled) console.error('Error fetching project:', error);
@@ -244,11 +265,17 @@ function ProjectDetailContent() {
         setSelectedOverviewMonth("all");
         setExpandedTabs({});
         setSearchQuery("");
+        setNotesSearchQuery("");
     }, [projectName]);
 
     const filteredEvents = (project?.meetings || []).filter(meeting =>
         meeting.display_name.toLowerCase().includes(searchQuery.toLowerCase())
     ) || [];
+
+    const filteredNotes = notes.filter(n =>
+        n.display_name.toLowerCase().includes(notesSearchQuery.toLowerCase()) ||
+        n.content.toLowerCase().includes(notesSearchQuery.toLowerCase())
+    );
 
     const handleDeleteProject = async () => {
         if (!project) return;
@@ -310,6 +337,31 @@ function ProjectDetailContent() {
             setIsDeletingMeeting(false);
             setShowDeleteMeetingDialog(false);
             setMeetingToDelete(null);
+        }
+    };
+
+    const handleDeleteNote = async () => {
+        if (!noteToDelete) return;
+
+        try {
+            setIsDeletingNote(true);
+            const response = await apiFetch(`/api/documents/${encodeURIComponent(noteToDelete.id)}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to delete note');
+            }
+
+            setNotes(prev => prev.filter(n => n.id !== noteToDelete.id));
+        } catch (error) {
+            console.error('Error deleting note:', error);
+            alert(error instanceof Error ? error.message : 'Failed to delete note');
+        } finally {
+            setIsDeletingNote(false);
+            setShowDeleteNoteDialog(false);
+            setNoteToDelete(null);
         }
     };
 
@@ -801,6 +853,116 @@ function ProjectDetailContent() {
                         </div>
                     )}
                 </div>
+
+                {/* Notes Section */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <h2 className="text-xl font-semibold">Notes</h2>
+                        <div className="flex-1 max-w-sm">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search notes..."
+                                    className="pl-9"
+                                    value={notesSearchQuery}
+                                    onChange={(e) => setNotesSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {filteredNotes.length === 0 ? (
+                        <Card className="py-12">
+                            <CardContent className="text-center">
+                                <NotebookPen className="size-12 text-muted-foreground mx-auto mb-4" />
+                                <h3 className="text-lg font-semibold mb-2">
+                                    {notesSearchQuery ? "No notes found" : "No notes yet"}
+                                </h3>
+                                <p className="text-muted-foreground mb-4">
+                                    {notesSearchQuery
+                                        ? "Try adjusting your search query"
+                                        : "Create your first note to capture project context"
+                                    }
+                                </p>
+                                {!notesSearchQuery && (
+                                    <Button asChild>
+                                        <AppLink href={`/notes?project=${encodeURIComponent(project.id)}`}>
+                                            <Plus className="size-4 mr-2" />
+                                            Create Note
+                                        </AppLink>
+                                    </Button>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid gap-4">
+                            {filteredNotes.map((note, index) => {
+                                const noteUrl = `/notes/detail?id=${encodeURIComponent(note.id)}`;
+                                return (
+                                    <Card key={note.id || index} className="group hover:shadow-md transition-shadow relative">
+                                        <CardHeader>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <AppLink
+                                                    href={noteUrl}
+                                                    className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                                                >
+                                                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+                                                        <NotebookPen className="size-5 text-primary" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <CardTitle className="text-base line-clamp-1">
+                                                            {note.display_name || 'Untitled Note'}
+                                                        </CardTitle>
+                                                        <CardDescription className="flex items-center gap-2 mt-1">
+                                                            <Calendar className="size-3" />
+                                                            {formatDate(note.created_at)}
+                                                            {note.mime_type && (
+                                                                <>
+                                                                    <span className="text-muted-foreground">·</span>
+                                                                    <Badge variant="outline" className="text-xs">
+                                                                        {note.mime_type.replace("text/", "")}
+                                                                    </Badge>
+                                                                </>
+                                                            )}
+                                                        </CardDescription>
+                                                    </div>
+                                                </AppLink>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="size-8 opacity-0 group-hover:opacity-100 transition-opacity relative z-10"
+                                                        >
+                                                            <MoreVertical className="size-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem asChild>
+                                                            <AppLink href={noteUrl}>
+                                                                View Note
+                                                            </AppLink>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => {
+                                                                setNoteToDelete(note);
+                                                                setShowDeleteNoteDialog(true);
+                                                            }}
+                                                            className="text-destructive"
+                                                        >
+                                                            <Trash2 className="size-4 mr-2" />
+                                                            Delete Note
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </CardHeader>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Delete Project Confirmation Dialog */}
@@ -876,6 +1038,47 @@ function ProjectDetailContent() {
                                 <>
                                     <Trash2 className="size-4 mr-2" />
                                     Delete Event
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Note Confirmation Dialog */}
+            <Dialog open={showDeleteNoteDialog} onOpenChange={setShowDeleteNoteDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Note</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete &quot;{noteToDelete?.display_name}&quot;? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowDeleteNoteDialog(false);
+                                setNoteToDelete(null);
+                            }}
+                            disabled={isDeletingNote}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteNote}
+                            disabled={isDeletingNote}
+                        >
+                            {isDeletingNote ? (
+                                <>
+                                    <Loader2 className="size-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="size-4 mr-2" />
+                                    Delete Note
                                 </>
                             )}
                         </Button>
