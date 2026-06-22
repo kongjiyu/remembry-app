@@ -20,7 +20,17 @@ pub async fn health(State(state): State<Arc<ApiState>>) -> Json<Value> {
 pub async fn start_recording(State(state): State<Arc<ApiState>>) -> Json<Value> {
     *state.last_request.lock().await = std::time::Instant::now();
 
-    // Emit event to WebView to start recording
+    // Check no active recording
+    {
+        let guard = state.recording.lock().await;
+        if guard.is_some() {
+            return Json(json!({
+                "status": "error",
+                "error": "A recording is already in progress"
+            }));
+        }
+    }
+
     match state.app.emit("start-record", ()) {
         Ok(_) => {
             log::info!("[API] Emitted start-record event to WebView");
@@ -65,11 +75,18 @@ pub async fn stop_recording(State(state): State<Arc<ApiState>>) -> Json<Value> {
 /// GET /api/record/status — Check recording status
 pub async fn recording_status(State(state): State<Arc<ApiState>>) -> Json<Value> {
     *state.last_request.lock().await = std::time::Instant::now();
-
-    // Emit event to WebView to get status, return placeholder for now
-    // The WebView will update its own state; this endpoint is for MCP to poll
-    Json(json!({
-        "status": "idle",
-        "message": "Use /api/record/start to begin recording"
-    }))
+    let guard = state.recording.lock().await;
+    match guard.as_ref() {
+        Some(s) => Json(json!({
+            "status": "recording",
+            "job_id": s.job_id,
+            "title": s.title,
+            "started_at_secs": s.started_at.elapsed().as_secs(),
+            "audio_path": s.audio_path.to_string_lossy(),
+        })),
+        None => Json(json!({
+            "status": "idle",
+            "message": "No active recording"
+        })),
+    }
 }
