@@ -127,6 +127,9 @@ const TAURI_COMMANDS: TauriCommandEntry[] = [
       language: b?.language || "en",
     };
   }},
+  { pattern: "/api/recording/start", method: "POST", command: "start_recording_session", extractParams: (_, __, body) => ({ title: (body as { title?: string })?.title || "Untitled" }) },
+  { pattern: "/api/recording/stop", method: "POST", command: "stop_recording_session", extractParams: () => ({}) },
+  { pattern: "/api/recording/state", method: "GET", command: "get_recording_state", extractParams: () => ({}) },
 ];
 
 class ApiResponse {
