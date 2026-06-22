@@ -1,3 +1,7 @@
+// DEPRECATED: Use `useRecording()` from `@/components/layout/recording-provider` instead.
+// Recording is now root-scoped so MCP and other pages can interact with it.
+// This file will be removed in a future commit.
+
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
