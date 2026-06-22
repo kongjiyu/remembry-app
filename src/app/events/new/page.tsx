@@ -76,6 +76,8 @@ interface UploadedFile {
     url?: string;
     fileType: FileType;
     mimeType?: string;
+    source?: "browser" | "recording";
+    tempPath?: string;
 }
 
 const EVENT_TYPE_PRESETS = [
@@ -238,6 +240,7 @@ export default function NewEventPage() {
                 size: file.size,
                 fileType: "text",
                 mimeType: file.type || undefined,
+                source: "browser",
             });
             return;
         }
@@ -259,6 +262,7 @@ export default function NewEventPage() {
                 url,
                 fileType: "audio",
                 mimeType: file.type || undefined,
+                source: "browser",
             });
         });
     };
@@ -295,6 +299,7 @@ export default function NewEventPage() {
             url,
             fileType: "audio",
             mimeType: blob.type || "audio/webm",
+            source: "recording",
         });
     };
 
@@ -544,18 +549,37 @@ export default function NewEventPage() {
                                             {uploadedFile.fileType === "text" && " · Text Transcript"}
                                         </p>
                                     </div>
-                                    {uploadedFile.url && (
+                                    {uploadedFile.source === "recording" && uploadedFile.tempPath ? (
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            asChild
+                                            onClick={async () => {
+                                                try {
+                                                    const res = await apiFetch("/api/audio/download", {
+                                                        method: "POST",
+                                                        body: JSON.stringify({
+                                                            sourcePath: uploadedFile.tempPath,
+                                                            suggestedFilename: uploadedFile.name,
+                                                        }),
+                                                    });
+                                                    if (!res.ok) throw new Error("Download failed");
+                                                    const data = await res.json();
+                                                    toast.success(`Saved to ${data}`);
+                                                } catch (err) {
+                                                    toast.error("Could not save audio");
+                                                }
+                                            }}
                                             className="text-muted-foreground hover:text-primary"
                                         >
+                                            <Download className="size-4" />
+                                        </Button>
+                                    ) : uploadedFile.url ? (
+                                        <Button variant="ghost" size="icon" asChild className="text-muted-foreground hover:text-primary">
                                             <a href={uploadedFile.url} download={uploadedFile.name}>
                                                 <Download className="size-4" />
                                             </a>
                                         </Button>
-                                    )}
+                                    ) : null}
                                     <Button
                                         variant="ghost"
                                         size="icon"
