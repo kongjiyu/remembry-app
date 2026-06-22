@@ -132,6 +132,21 @@ fn get_api_key() -> Result<String, String> {
     secrets::get_gemini_key().map_err(|e| e.to_string())
 }
 
+/// Validate that a job record can be retried.
+/// Returns Ok(PathBuf) if the job is in "failed" state with a valid temp file on disk.
+pub fn validate_retry(record: &UploadJobRecord) -> Result<PathBuf, String> {
+    if record.status != "failed" {
+        return Err(format!("Job {} is not in 'failed' state (status: {})", record.job_id, record.status));
+    }
+    let temp_path = record.temp_path.as_ref()
+        .ok_or_else(|| format!("No temp file recorded for job {}", record.job_id))?;
+    let path = std::path::PathBuf::from(temp_path);
+    if !path.exists() {
+        return Err(format!("Temp audio file no longer exists: {}", temp_path));
+    }
+    Ok(path)
+}
+
 fn job_record_to_upload_job(record: UploadJobRecord) -> UploadJob {
     UploadJob {
         job_id: record.job_id,
@@ -767,25 +782,26 @@ pub async fn retry_upload(
     app: AppHandle,
     job_id: String,
 ) -> Result<UploadJob, String> {
+    // Load record for validation
     let record = db::upload_jobs::get_upload_job(&job_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("Job not found: {}", job_id))?;
 
-    if record.status != "failed" {
-        return Err(format!("Job {} is not failed (status: {})", job_id, record.status));
-    }
+    // Validate state before attempting atomic transition
+    let _path = validate_retry(&record)?;
 
-    let temp_path = record.temp_path.as_ref()
-        .ok_or_else(|| "No temp file recorded for this job — cannot retry".to_string())?;
-    let path = std::path::PathBuf::from(temp_path);
-    if !path.exists() {
-        return Err("Temp audio file no longer exists on disk".to_string());
-    }
-
+    // Atomically flip failed → queued; returns false if job wasn't in "failed" state
     let now = Utc::now().to_rfc3339();
-    db::upload_jobs::update_upload_job_status(
-        &job_id, "queued", 0, "Retrying...", None, None, &now,
-    ).map_err(|e| e.to_string())?;
+    if !db::upload_jobs::try_mark_failed_as_queued(&job_id, &now)
+        .map_err(|e| e.to_string())?
+    {
+        return Err(format!("Job {} is not in 'failed' state — cannot retry", job_id));
+    }
+
+    // Re-read record to get refreshed state (timestamp, etc.)
+    let refreshed = db::upload_jobs::get_upload_job(&job_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Job disappeared after retry transition".to_string())?;
 
     // Spawn the existing background processor — it reuses temp_path and params_json
     let job_id_clone = job_id.clone();
@@ -794,9 +810,6 @@ pub async fn retry_upload(
         process_upload_background(job_id_clone, app_clone).await;
     });
 
-    let refreshed = db::upload_jobs::get_upload_job(&job_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Job disappeared".to_string())?;
     Ok(job_record_to_upload_job(refreshed))
 }
 
@@ -1412,46 +1425,70 @@ mod tests {
         .unwrap();
     }
 
-    // ── retry_upload tests ────────────────────────────────────────────────────
+    // ── validate_retry tests ──────────────────────────────────────────────────
 
-    #[tokio::test]
-    async fn retry_upload_rejects_when_not_failed() {
-        let td = TestDb::new();
-        td.with_conn(|conn| {
-            conn.execute(
-                "INSERT INTO upload_jobs (job_id, status, progress, message, project_id, title, created_at, updated_at, job_type, temp_path) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)",
-                rusqlite::params!["j1", "completed", 100, "ok", "p1", "t", "2026-01-01", "2026-01-01", "upload"],
-            ).unwrap();
-            Ok(())
-        }).unwrap();
-        // Use a direct connection query via with_db_impl
-        let pool_arc = std::sync::Arc::new(std::sync::Mutex::new(Some(td.pool.clone())));
-        let job = crate::db::with_db_impl(Some(pool_arc.clone()), |conn| {
-            let mut stmt = conn.prepare(
-                "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name, job_type FROM upload_jobs WHERE job_id = ?1"
-            ).map_err(|e| e.to_string())?;
-            let mut rows = stmt.query(rusqlite::params!["j1"]).map_err(|e| e.to_string())?;
-            let row = rows.next().map_err(|e| e.to_string())?.ok_or("not found")?;
-            Ok(UploadJobRecord {
-                job_id: row.get(0).map_err(|e| e.to_string())?,
-                status: row.get(1).map_err(|e| e.to_string())?,
-                progress: row.get(2).map_err(|e| e.to_string())?,
-                message: row.get(3).map_err(|e| e.to_string())?,
-                error: row.get(4).map_err(|e| e.to_string())?,
-                meeting_id: row.get(5).map_err(|e| e.to_string())?,
-                project_id: row.get(6).map_err(|e| e.to_string())?,
-                title: row.get(7).map_err(|e| e.to_string())?,
-                created_at: row.get(8).map_err(|e| e.to_string())?,
-                updated_at: row.get(9).map_err(|e| e.to_string())?,
-                temp_path: row.get(10).map_err(|e| e.to_string())?,
-                params_json: row.get(11).map_err(|e| e.to_string())?,
-                gemini_file_name: row.get(12).map_err(|e| e.to_string())?,
-                job_type: row.get(13).map_err(|e| e.to_string())?,
-            })
-        }).unwrap();
-        assert_eq!(job.status, "completed");
-        let can_retry = matches!(job.status.as_str(), "failed");
-        assert!(!can_retry);
+    fn make_record(job_id: &str, status: &str, temp_path: Option<&str>) -> UploadJobRecord {
+        UploadJobRecord {
+            job_id: job_id.to_string(),
+            status: status.to_string(),
+            progress: 0,
+            message: String::new(),
+            error: None,
+            meeting_id: None,
+            project_id: "pid".to_string(),
+            title: "title".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+            temp_path: temp_path.map(|s| s.to_string()),
+            params_json: None,
+            gemini_file_name: None,
+            job_type: "upload".to_string(),
+        }
+    }
+
+    #[test]
+    fn validate_retry_rejects_completed_status() {
+        let record = make_record("j1", "completed", Some("/tmp/audio.upload"));
+        let result = validate_retry(&record);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not in 'failed' state"));
+    }
+
+    #[test]
+    fn validate_retry_rejects_queued_status() {
+        let record = make_record("j2", "queued", Some("/tmp/audio.upload"));
+        let result = validate_retry(&record);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not in 'failed' state"));
+    }
+
+    #[test]
+    fn validate_retry_rejects_failed_with_no_temp_path() {
+        let record = make_record("j3", "failed", None);
+        let result = validate_retry(&record);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("No temp file recorded"));
+    }
+
+    #[test]
+    fn validate_retry_rejects_failed_with_missing_file() {
+        let record = make_record("j4", "failed", Some("/nonexistent/path.upload"));
+        let result = validate_retry(&record);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("no longer exists"));
+    }
+
+    #[test]
+    fn validate_retry_accepts_failed_with_existing_file() {
+        // Create a real temp file that lives for the duration of this test
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("audio.upload");
+        std::fs::write(&path, b"fake audio data").unwrap();
+
+        let record = make_record("j5", "failed", Some(path.to_str().unwrap()));
+        let result = validate_retry(&record);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), path);
     }
 }
 

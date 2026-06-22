@@ -264,6 +264,21 @@ pub fn mark_job_failed(job_id: &str, message: &str, error: Option<String>) -> Re
     }).map_err(|e| e.to_string())
 }
 
+/// Atomically transition a job from "failed" to "queued" for retry.
+/// Returns true if the transition succeeded (exactly one row was updated),
+/// false if the job was not in "failed" state or does not exist.
+pub fn try_mark_failed_as_queued(job_id: &str, now: &str) -> Result<bool, String> {
+    with_db(|conn| try_mark_failed_as_queued_with_conn(conn, job_id, now)).map_err(|e| e.to_string())
+}
+
+pub fn try_mark_failed_as_queued_with_conn(conn: &rusqlite::Connection, job_id: &str, now: &str) -> Result<bool, String> {
+    let rows = conn.execute(
+        "UPDATE upload_jobs SET status = 'queued', progress = 0, message = 'Retrying...', updated_at = ?2 WHERE job_id = ?1 AND status = 'failed'",
+        rusqlite::params![job_id, now],
+    ).map_err(|e| e.to_string())?;
+    Ok(rows == 1)
+}
+
 /// Clear the temp_path field on a job, indicating local file has been cleaned up.
 pub fn clear_temp_path(job_id: &str) -> Result<(), String> {
     with_db(|conn| clear_temp_path_with_conn(conn, job_id)).map_err(|e| e.to_string())
@@ -341,6 +356,17 @@ mod tests {
             rusqlite::params![job_id, status, now, gemini_file_name],
         ).map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    fn get_job_status_internal(conn: &rusqlite::Connection, job_id: &str) -> Result<Option<String>, String> {
+        let mut stmt = conn.prepare("SELECT status FROM upload_jobs WHERE job_id = ?1")
+            .map_err(|e| e.to_string())?;
+        let row_result = stmt.query_row(rusqlite::params![job_id], |row| row.get(0));
+        match row_result {
+            Ok(val) => Ok(Some(val)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.to_string()),
+        }
     }
 
     #[test]
@@ -575,5 +601,65 @@ mod tests {
         assert_eq!(jobs[0].temp_path.as_deref(), Some("/tmp/file_a.upload"), "job_a unchanged");
         assert_eq!(jobs[1].temp_path.as_deref(), None, "job_b cleared");
         assert_eq!(jobs[2].temp_path.as_deref(), Some("/tmp/file_c.upload"), "job_c unchanged");
+    }
+
+    #[test]
+    fn try_mark_failed_as_queued_returns_true_when_job_is_failed() {
+        let td = TestDb::new();
+        td.with_conn(|conn| {
+            insert_job(conn, "job_retry", "failed", None).unwrap();
+            Ok(())
+        }).unwrap();
+
+        let pool_arc: Arc<Mutex<Option<crate::db::DbPool>>> = Arc::new(Mutex::new(Some(td.pool.clone())));
+        let now = chrono::Utc::now().to_rfc3339();
+        let result = crate::db::with_db_impl(Some(pool_arc.clone()), |_conn| {
+            crate::db::upload_jobs::try_mark_failed_as_queued_with_conn(_conn, "job_retry", &now)
+        }).unwrap();
+
+        assert!(result, "should return true when job is in failed state");
+
+        // Verify the job was actually updated
+        td.with_conn(|conn| {
+            let status = get_job_status_internal(conn, "job_retry").unwrap();
+            assert_eq!(status.as_deref(), Some("queued"));
+            Ok(())
+        }).unwrap();
+    }
+
+    #[test]
+    fn try_mark_failed_as_queued_returns_false_when_job_is_not_failed() {
+        let td = TestDb::new();
+        td.with_conn(|conn| {
+            insert_job(conn, "job_completed", "completed", None).unwrap();
+            Ok(())
+        }).unwrap();
+
+        let pool_arc: Arc<Mutex<Option<crate::db::DbPool>>> = Arc::new(Mutex::new(Some(td.pool.clone())));
+        let now = chrono::Utc::now().to_rfc3339();
+        let result = crate::db::with_db_impl(Some(pool_arc.clone()), |_conn| {
+            crate::db::upload_jobs::try_mark_failed_as_queued_with_conn(_conn, "job_completed", &now)
+        }).unwrap();
+
+        assert!(!result, "should return false when job is not in failed state");
+
+        // Verify the job status was NOT changed
+        td.with_conn(|conn| {
+            let status = get_job_status_internal(conn, "job_completed").unwrap();
+            assert_eq!(status.as_deref(), Some("completed"));
+            Ok(())
+        }).unwrap();
+    }
+
+    #[test]
+    fn try_mark_failed_as_queued_returns_false_for_nonexistent_job() {
+        let td = TestDb::new();
+        let pool_arc: Arc<Mutex<Option<crate::db::DbPool>>> = Arc::new(Mutex::new(Some(td.pool.clone())));
+        let now = chrono::Utc::now().to_rfc3339();
+        let result = crate::db::with_db_impl(Some(pool_arc), |_conn| {
+            crate::db::upload_jobs::try_mark_failed_as_queued_with_conn(_conn, "nonexistent_job", &now)
+        }).unwrap();
+
+        assert!(!result, "should return false for nonexistent job");
     }
 }
