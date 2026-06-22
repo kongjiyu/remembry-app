@@ -210,6 +210,7 @@ pub fn run() {
             commands::uploads::get_upload_job,
             commands::uploads::dismiss_upload_job,
             commands::uploads::cancel_upload_job,
+            commands::uploads::retry_upload,
             commands::download::download_audio,
             commands::events::get_event_knowledge,
             commands::events::update_event_knowledge,
