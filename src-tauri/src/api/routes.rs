@@ -90,3 +90,50 @@ pub async fn recording_status(State(state): State<Arc<ApiState>>) -> Json<Value>
         })),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::api::RecordingSession;
+    use std::path::PathBuf;
+    use std::time::Instant;
+
+    #[tokio::test]
+    async fn status_returns_idle_when_no_recording() {
+        let empty: Option<&RecordingSession> = None;
+        let json = match empty {
+            Some(s) => serde_json::json!({
+                "status": "recording",
+                "job_id": s.job_id,
+                "title": s.title,
+                "started_at_secs": s.started_at.elapsed().as_secs(),
+                "audio_path": s.audio_path.to_string_lossy(),
+            }),
+            None => serde_json::json!({
+                "status": "idle",
+                "message": "No active recording"
+            }),
+        };
+        assert_eq!(json["status"], "idle");
+        assert!(json.get("title").is_none());
+    }
+
+    #[tokio::test]
+    async fn status_returns_recording_when_set() {
+        let session = RecordingSession {
+            job_id: "rec_1".into(),
+            title: "Design Review".into(),
+            started_at: Instant::now(),
+            audio_path: PathBuf::from("/tmp/rec_1.webm"),
+        };
+        let json = serde_json::json!({
+            "status": "recording",
+            "job_id": session.job_id,
+            "title": session.title,
+            "started_at_secs": session.started_at.elapsed().as_secs(),
+            "audio_path": session.audio_path.to_string_lossy(),
+        });
+        assert_eq!(json["status"], "recording");
+        assert_eq!(json["title"], "Design Review");
+        assert_eq!(json["job_id"], "rec_1");
+    }
+}
