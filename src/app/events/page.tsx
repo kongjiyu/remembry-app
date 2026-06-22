@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Mic, Upload, Search, MoreVertical, Clock, CheckCircle2, Loader2, AlertCircle, FolderKanban, Trash2 } from "lucide-react";
+import { Mic, Upload, Search, MoreVertical, Clock, CheckCircle2, Loader2, AlertCircle, FolderKanban, Trash2, Download } from "lucide-react";
 import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
 import { normalizeMeeting, buildProjectMap, formatMimeBadgeLabel, type NormalizedMeeting } from "@/lib/meetingViews";
 import { UploadJobsBanner } from "@/components/ui/upload-jobs-banner";
+import { toast } from "sonner";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -55,6 +56,21 @@ function getStatusInfo(status: string) {
     }
 }
 
+interface FailedJob {
+    job_id: string;
+    status: string;
+    progress: number;
+    message: string;
+    error: string | null;
+    meeting_id: string | null;
+    project_id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+    job_type: string;
+    temp_path: string | null;
+}
+
 export default function EventsPage() {
     const [meetings, setMeetings] = useState<NormalizedMeeting[]>([]);
     const [loading, setLoading] = useState(true);
@@ -62,10 +78,20 @@ export default function EventsPage() {
     const [meetingToDelete, setMeetingToDelete] = useState<NormalizedMeeting | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<"all" | "failed">("all");
+    const [failedJobs, setFailedJobs] = useState<FailedJob[]>([]);
 
     useEffect(() => {
         fetchMeetings();
     }, []);
+
+    useEffect(() => {
+        if (statusFilter === "failed") {
+            fetchFailedJobs();
+        } else {
+            setFailedJobs([]);
+        }
+    }, [statusFilter]);
 
     const fetchMeetings = async () => {
         try {
@@ -87,6 +113,16 @@ export default function EventsPage() {
             console.error('Error fetching events:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchFailedJobs = async () => {
+        try {
+            const { invoke } = await import("@tauri-apps/api/core");
+            const failed: FailedJob[] = await invoke("list_upload_jobs", { statusFilter: "failed" });
+            setFailedJobs(failed);
+        } catch (error) {
+            console.error('Error fetching failed jobs:', error);
         }
     };
 
@@ -136,6 +172,33 @@ export default function EventsPage() {
             setMeetingToDelete(null);
         }
     };
+
+    const handleRetry = async (jobId: string) => {
+        const res = await apiFetch("/api/upload-jobs/retry", {
+            method: "POST",
+            body: JSON.stringify({ jobId }),
+        });
+        if (res.ok) {
+            toast.success("Retry started");
+            fetchMeetings();
+            fetchFailedJobs();
+        } else {
+            toast.error("Retry failed");
+        }
+    };
+
+    const handleDownloadFailed = async (job: FailedJob) => {
+        const res = await apiFetch("/api/audio/download", {
+            method: "POST",
+            body: JSON.stringify({ sourcePath: job.temp_path, suggestedFilename: `${job.title}.webm` }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            toast.success(`Saved to ${data}`);
+        } else {
+            toast.error("Download failed");
+        }
+    };
     return (
         <DashboardLayout breadcrumbs={[{ label: "Events" }]} title="Events">
             <div className="space-y-6">
@@ -160,6 +223,40 @@ export default function EventsPage() {
 
                 {/* Active / Failed Upload Jobs */}
                 <UploadJobsBanner onJobCompleted={fetchMeetings} />
+
+                {/* Filter chips */}
+                <div className="flex gap-2">
+                    <Button variant={statusFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("all")}>All</Button>
+                    <Button variant={statusFilter === "failed" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("failed")}>
+                        Failed {failedJobs.length > 0 && <Badge variant="destructive">{failedJobs.length}</Badge>}
+                    </Button>
+                </div>
+
+                {/* Failed jobs section */}
+                {statusFilter === "failed" && (
+                    <div className="space-y-2">
+                        {failedJobs.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                <p>No failed uploads</p>
+                            </div>
+                        ) : failedJobs.map(job => (
+                            <Card key={job.job_id}>
+                                <CardContent className="flex items-center gap-4 p-4">
+                                    <div className="flex-1">
+                                        <p className="font-medium">{job.title}</p>
+                                        <p className="text-sm text-muted-foreground">{job.error}</p>
+                                    </div>
+                                    {job.temp_path && (
+                                        <Button variant="ghost" size="icon" onClick={() => handleDownloadFailed(job)}>
+                                            <Download className="size-4" />
+                                        </Button>
+                                    )}
+                                    <Button onClick={() => handleRetry(job.job_id)}>Retry</Button>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                )}
 
                 {/* Loading State */}
                 {loading ? (
