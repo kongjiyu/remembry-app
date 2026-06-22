@@ -128,7 +128,8 @@ mod tests {
         let downloads = make_temp_dir("dl4");
         let audio = app_data.join("rec.webm");
         fs::write(&audio, b"x").unwrap();
-        let _ = resolve_download_target(&app_data, &downloads, &audio, Some("rec.webm")).unwrap();
+        let first = resolve_download_target(&app_data, &downloads, &audio, Some("rec.webm")).unwrap();
+        fs::write(&first, b"existing").unwrap();
         let second = resolve_download_target(&app_data, &downloads, &audio, Some("rec.webm")).unwrap();
         assert_eq!(second.file_name().unwrap(), "rec-1.webm");
     }
