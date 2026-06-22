@@ -5,6 +5,7 @@ pub mod meetings;
 pub mod notes;
 pub mod gemini_key;
 pub mod uploads;
+pub mod download;
 pub mod events;
 pub mod ask;
 
