@@ -6,9 +6,18 @@ use tauri::Manager;
 
 const SUBDIR: &str = "Remembry";
 
-#[derive(Debug, PartialEq)]
-pub struct DownloadResult {
-    pub saved_path: PathBuf,
+fn sanitize_filename(input: &str) -> String {
+    let trimmed = input.trim();
+    let stripped: String = trimmed
+        .chars()
+        .filter(|c| !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+        .collect();
+    let no_dots = stripped.trim_start_matches('.').to_string();
+    if no_dots.is_empty() {
+        "recording".to_string()
+    } else {
+        no_dots
+    }
 }
 
 pub fn resolve_download_target(
@@ -26,7 +35,7 @@ pub fn resolve_download_target(
 
     // 2. Resolve filename
     let filename = match suggested_filename {
-        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        Some(s) if !s.trim().is_empty() => sanitize_filename(s),
         _ => canonical_source
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -132,5 +141,14 @@ mod tests {
         fs::write(&first, b"existing").unwrap();
         let second = resolve_download_target(&app_data, &downloads, &audio, Some("rec.webm")).unwrap();
         assert_eq!(second.file_name().unwrap(), "rec-1.webm");
+    }
+
+    #[test]
+    fn sanitizes_path_traversal_in_suggested_filename() {
+        assert_eq!(sanitize_filename("../../foo.exe"), "foo.exe");
+        assert_eq!(sanitize_filename("..\\..\\bar.webm"), "bar.webm");
+        assert_eq!(sanitize_filename("normal.webm"), "normal.webm");
+        assert_eq!(sanitize_filename("..."), "recording");
+        assert_eq!(sanitize_filename(".bashrc"), "bashrc");
     }
 }

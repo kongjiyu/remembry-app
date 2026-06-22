@@ -549,6 +549,9 @@ export default function NewEventPage() {
                                             {uploadedFile.fileType === "text" && " · Text Transcript"}
                                         </p>
                                     </div>
+                                    {/*
+                                      TODO(commit-2): tempPath populated when recording saves to app_data_dir
+                                    */}
                                     {uploadedFile.source === "recording" && uploadedFile.tempPath ? (
                                         <Button
                                             variant="ghost"
