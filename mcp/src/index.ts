@@ -1098,7 +1098,15 @@ const API_BASE = "http://127.0.0.1:17890";
 
 async function apiFetch(path: string, options?: RequestInit): Promise<any> {
   const res = await fetch(`${API_BASE}${path}`, options);
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Remembry API ${path} failed: HTTP ${res.status} — ${text.slice(0, 200)}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 // ── Tool: start_recording ────────────────────────────────────────────────
