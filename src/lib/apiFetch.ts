@@ -131,6 +131,19 @@ const TAURI_COMMANDS: TauriCommandEntry[] = [
   { pattern: "/api/recording/stop", method: "POST", command: "stop_recording_session", extractParams: () => ({}) },
   { pattern: "/api/recording/state", method: "GET", command: "get_recording_state", extractParams: () => ({}) },
   { pattern: "/api/audio/save", method: "POST", command: "save_audio_blob", extractParams: (_, __, body) => ({ jobId: (body as { jobId?: string })?.jobId || "", bytes: (body as { bytes?: number[] })?.bytes || [] }) },
+  { pattern: "/api/documents", method: "GET", command: "list_documents", extractParams: (_, q) => ({ projectId: q?.get("project_id") || null }) },
+  { pattern: "/api/documents", method: "POST", command: "create_document", extractParams: (_, __, body) => {
+    const b = body as { projectId?: string; displayName?: string; content?: string; mimeType?: string } | null;
+    return { projectId: b?.projectId || "", displayName: b?.displayName || "", content: b?.content || "", mimeType: b?.mimeType || null };
+  }},
+  { pattern: "/api/documents/import", method: "POST", command: "import_text_file", extractParams: (_, __, body) => ({ projectId: (body as { projectId?: string })?.projectId || "", filePath: (body as { filePath?: string })?.filePath || "" }) },
+  { pattern: "/api/documents/:id", method: "GET", command: "get_document", extractParams: (p) => ({ id: matchRoute("/api/documents/:id", p)?.id || "" }) },
+  { pattern: "/api/documents/:id", method: "PUT", command: "update_document", extractParams: (p, _, body) => {
+    const m = matchRoute("/api/documents/:id", p);
+    const b = body as { displayName?: string; content?: string } | null;
+    return { id: m?.id || "", displayName: b?.displayName || null, content: b?.content || null };
+  }},
+  { pattern: "/api/documents/:id", method: "DELETE", command: "delete_document", extractParams: (p) => ({ id: matchRoute("/api/documents/:id", p)?.id || "" }) },
 ];
 
 class ApiResponse {
