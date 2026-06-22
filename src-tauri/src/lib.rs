@@ -221,6 +221,7 @@ pub fn run() {
             commands::recording::start_recording_session,
             commands::recording::stop_recording_session,
             commands::recording::get_recording_state,
+            commands::audio::save_audio_blob,
         ])
         .setup(|app| {
             // Initialize database

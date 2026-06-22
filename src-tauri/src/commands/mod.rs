@@ -9,6 +9,7 @@ pub mod download;
 pub mod events;
 pub mod ask;
 pub mod recording;
+pub mod audio;
 
 #[cfg(test)]
 pub mod tests;
