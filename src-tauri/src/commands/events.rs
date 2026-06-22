@@ -190,6 +190,7 @@ pub async fn enqueue_event_knowledge_extraction(
         created_at: record.created_at.clone(),
         updated_at: record.updated_at.clone(),
         job_type: record.job_type.clone(),
+        temp_path: record.temp_path.clone(),
     };
     let _ = app.emit("meeting-upload-progress", &job);
 
@@ -224,6 +225,7 @@ async fn process_knowledge_extraction_background(job_id: String, meeting_id: Str
             created_at: r.created_at,
             updated_at: r.updated_at,
             job_type: r.job_type,
+            temp_path: r.temp_path,
         });
         if let Some(j) = job {
             let _ = app.emit("meeting-upload-progress", &j);

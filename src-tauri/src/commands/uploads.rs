@@ -39,6 +39,8 @@ pub struct UploadJob {
     pub updated_at: String,
     #[serde(default)]
     pub job_type: String,
+    #[serde(default)]
+    pub temp_path: Option<String>,
 }
 
 impl From<UploadJobRecord> for UploadJob {
@@ -55,6 +57,7 @@ impl From<UploadJobRecord> for UploadJob {
             created_at: r.created_at,
             updated_at: r.updated_at,
             job_type: r.job_type,
+            temp_path: r.temp_path,
         }
     }
 }
@@ -142,6 +145,7 @@ fn job_record_to_upload_job(record: UploadJobRecord) -> UploadJob {
         created_at: record.created_at.clone(),
         updated_at: record.updated_at.clone(),
         job_type: record.job_type,
+        temp_path: record.temp_path,
     }
 }
 
@@ -360,7 +364,7 @@ pub fn enqueue_meeting_upload_processing(
     Ok(EnqueueResponse { job_id })
 }
 
-async fn process_upload_background(job_id: String, app: AppHandle) {
+pub async fn process_upload_background(job_id: String, app: AppHandle) {
     // Load job record from SQLite (not from in-memory cache)
     let record = match db::upload_jobs::get_upload_job(&job_id) {
         Ok(Some(r)) => r,
@@ -693,10 +697,16 @@ fn is_cancelled(job_id: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn list_upload_jobs() -> Result<Vec<UploadJob>, String> {
-    // Read from SQLite — the source of truth
+pub fn list_upload_jobs(status_filter: Option<String>) -> Result<Vec<UploadJob>, String> {
     let records = db::upload_jobs::list_upload_jobs().map_err(|e| e.to_string())?;
-    Ok(records.into_iter().map(job_record_to_upload_job).collect())
+    let jobs: Vec<UploadJob> = records.into_iter().map(job_record_to_upload_job).collect();
+    match status_filter.as_deref() {
+        Some("failed") => Ok(jobs.into_iter().filter(|j| j.status == "failed").collect()),
+        Some("active") => Ok(jobs.into_iter().filter(|j| {
+            !["completed", "failed", "cancelled"].contains(&j.status.as_str())
+        }).collect()),
+        _ => Ok(jobs),
+    }
 }
 
 #[tauri::command]
@@ -750,6 +760,44 @@ pub fn cancel_upload_job(job_id: String, app: AppHandle) -> Result<bool, String>
     }
 
     Ok(true)
+}
+
+#[tauri::command]
+pub async fn retry_upload(
+    app: AppHandle,
+    job_id: String,
+) -> Result<UploadJob, String> {
+    let record = db::upload_jobs::get_upload_job(&job_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Job not found: {}", job_id))?;
+
+    if record.status != "failed" {
+        return Err(format!("Job {} is not failed (status: {})", job_id, record.status));
+    }
+
+    let temp_path = record.temp_path.as_ref()
+        .ok_or_else(|| "No temp file recorded for this job — cannot retry".to_string())?;
+    let path = std::path::PathBuf::from(temp_path);
+    if !path.exists() {
+        return Err("Temp audio file no longer exists on disk".to_string());
+    }
+
+    let now = Utc::now().to_rfc3339();
+    db::upload_jobs::update_upload_job_status(
+        &job_id, "queued", 0, "Retrying...", None, None, &now,
+    ).map_err(|e| e.to_string())?;
+
+    // Spawn the existing background processor — it reuses temp_path and params_json
+    let job_id_clone = job_id.clone();
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        process_upload_background(job_id_clone, app_clone).await;
+    });
+
+    let refreshed = db::upload_jobs::get_upload_job(&job_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Job disappeared".to_string())?;
+    Ok(job_record_to_upload_job(refreshed))
 }
 
 #[tauri::command]
@@ -1362,6 +1410,48 @@ mod tests {
             Ok(())
         })
         .unwrap();
+    }
+
+    // ── retry_upload tests ────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn retry_upload_rejects_when_not_failed() {
+        let td = TestDb::new();
+        td.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO upload_jobs (job_id, status, progress, message, project_id, title, created_at, updated_at, job_type, temp_path) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)",
+                rusqlite::params!["j1", "completed", 100, "ok", "p1", "t", "2026-01-01", "2026-01-01", "upload"],
+            ).unwrap();
+            Ok(())
+        }).unwrap();
+        // Use a direct connection query via with_db_impl
+        let pool_arc = std::sync::Arc::new(std::sync::Mutex::new(Some(td.pool.clone())));
+        let job = crate::db::with_db_impl(Some(pool_arc.clone()), |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT job_id, status, progress, message, error, meeting_id, project_id, title, created_at, updated_at, temp_path, params_json, gemini_file_name, job_type FROM upload_jobs WHERE job_id = ?1"
+            ).map_err(|e| e.to_string())?;
+            let mut rows = stmt.query(rusqlite::params!["j1"]).map_err(|e| e.to_string())?;
+            let row = rows.next().map_err(|e| e.to_string())?.ok_or("not found")?;
+            Ok(UploadJobRecord {
+                job_id: row.get(0).map_err(|e| e.to_string())?,
+                status: row.get(1).map_err(|e| e.to_string())?,
+                progress: row.get(2).map_err(|e| e.to_string())?,
+                message: row.get(3).map_err(|e| e.to_string())?,
+                error: row.get(4).map_err(|e| e.to_string())?,
+                meeting_id: row.get(5).map_err(|e| e.to_string())?,
+                project_id: row.get(6).map_err(|e| e.to_string())?,
+                title: row.get(7).map_err(|e| e.to_string())?,
+                created_at: row.get(8).map_err(|e| e.to_string())?,
+                updated_at: row.get(9).map_err(|e| e.to_string())?,
+                temp_path: row.get(10).map_err(|e| e.to_string())?,
+                params_json: row.get(11).map_err(|e| e.to_string())?,
+                gemini_file_name: row.get(12).map_err(|e| e.to_string())?,
+                job_type: row.get(13).map_err(|e| e.to_string())?,
+            })
+        }).unwrap();
+        assert_eq!(job.status, "completed");
+        let can_retry = matches!(job.status.as_str(), "failed");
+        assert!(!can_retry);
     }
 }
 
