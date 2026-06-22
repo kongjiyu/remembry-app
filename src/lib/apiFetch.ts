@@ -116,6 +116,7 @@ const TAURI_COMMANDS: TauriCommandEntry[] = [
     const b = body as { sourcePath?: string; suggestedFilename?: string } | null;
     return { sourcePath: b?.sourcePath || "", suggestedFilename: b?.suggestedFilename || null };
   }},
+  { pattern: "/api/upload-jobs/retry", method: "POST", command: "retry_upload", extractParams: (_, __, body) => ({ jobId: (body as { jobId?: string })?.jobId || "" }) },
   { pattern: "/api/ask", method: "POST", command: "ask_question", extractParams: (_, __, body) => {
     const b = body as { scope?: string; projectId?: string; meetingId?: string; question?: string; language?: string } | null;
     return {
