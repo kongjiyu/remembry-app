@@ -30,22 +30,22 @@ export interface AudioRecorderActions {
  * `RecordingProvider`. The provider owns the single `MediaRecorder`
  * instance and persists state to the Tauri backend.
  *
- * UI-only state (analyser, pause/resume, blob preview, duration,
- * permission flow) remains local to this hook so the existing
- * `<AudioRecorder>` component continues to render unchanged.
+ * UI-only state (analyser, blob preview duration, permission flow)
+ * remains local to this hook so the existing `<AudioRecorder>`
+ * component continues to render unchanged.
  *
- * `startRecording` / `stopRecording` / `isRecording` are forwarded to
+ * `startRecording` / `stopRecording` / `pauseRecording` /
+ * `resumeRecording` / `isRecording` / `isPaused` are forwarded to
  * the provider so MCP-driven `start-record` events and user-clicked
  * "Start" buttons all drive the same underlying MediaRecorder.
  */
 export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     const provider = useRecording();
 
-    // Local UI-only state. Recording lifecycle (isRecording) is derived
-    // from the provider, but the rest of the recorder UI (pause, blob,
-    // analyser, error, duration) stays local so the <AudioRecorder>
+    // Local UI-only state. Recording lifecycle is derived from the
+    // provider, but the rest of the recorder UI (analyser, duration
+    // counter, permission flow) stays local so the <AudioRecorder>
     // component's behaviour is preserved.
-    const [isPaused, setIsPaused] = useState(false);
     const [duration, setDuration] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -53,12 +53,12 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     const [hasPermission, setHasPermission] = useState<boolean | null>(null);
     const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const audioUrlRef = useRef<string | null>(null);
+    const providerActive = provider.status === "recording" || provider.status === "paused";
     const providerRecording = provider.status === "recording";
 
     // Check microphone permission status on mount (without triggering prompt)
@@ -85,12 +85,29 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         checkPermission();
     }, []);
 
+    // When the provider reports a completed recording, mirror its blob
+    // into our local state so the <AudioRecorder> preview can show the
+    // "Use Recording" panel. The provider keeps the blob in memory and
+    // hands it to us via context — no disk roundtrip needed.
+    useEffect(() => {
+        const completed = provider.lastCompleted;
+        if (!completed) return;
+        queueMicrotask(() => {
+            if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+            const url = URL.createObjectURL(completed.blob);
+            audioUrlRef.current = url;
+            setAudioBlob(completed.blob);
+            setAudioUrl(url);
+            setDuration(completed.durationSec);
+        });
+    }, [provider.lastCompleted]);
+
     // Sync local analyser/UI state when the provider transitions to recording.
     // When the provider starts a recording (from MCP or from this hook), we
     // attach a parallel local AudioContext for the visualizer. The actual
     // audio capture lives in the provider's MediaRecorder.
     useEffect(() => {
-        if (!providerRecording) {
+        if (!providerActive) {
             // Stop local UI bits. Wrap cleanup-driven setState in a
             // microtask so React's lint rule (no synchronous setState in
             // effect bodies) doesn't fire — the actual reset still
@@ -135,7 +152,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
                 audioContextRef.current = audioContext;
                 sourceRef.current = source;
                 setAnalyser(analyserNode);
-                if (provider.startedAt) {
+                if (provider.startedAt && providerRecording) {
                     const startMs = provider.startedAt;
                     setDuration(Math.floor((Date.now() - startMs) / 1000));
                     timerRef.current = setInterval(() => {
@@ -150,7 +167,29 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         return () => {
             cancelled = true;
         };
-    }, [providerRecording, provider.startedAt]);
+    }, [providerActive, providerRecording, provider.startedAt]);
+
+    // Pause the duration timer when the provider is paused; restart on resume.
+    useEffect(() => {
+        if (provider.status === "paused") {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        } else if (provider.status === "recording" && provider.startedAt) {
+            if (timerRef.current) return; // already running
+            const startMs = provider.startedAt;
+            setDuration(Math.floor((Date.now() - startMs) / 1000));
+            timerRef.current = setInterval(() => {
+                setDuration(Math.floor((Date.now() - startMs) / 1000));
+            }, 1000);
+        }
+    }, [provider.status, provider.startedAt]);
+
+    // Keep audioUrlRef in sync so the unmount cleanup can revoke the latest URL
+    useEffect(() => {
+        audioUrlRef.current = audioUrl;
+    }, [audioUrl]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -164,11 +203,12 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
             if (audioContextRef.current && audioContextRef.current.state !== "closed") {
                 audioContextRef.current.close();
             }
-            if (audioUrl) {
-                URL.revokeObjectURL(audioUrl);
+            if (audioUrlRef.current) {
+                URL.revokeObjectURL(audioUrlRef.current);
+                audioUrlRef.current = null;
             }
         };
-    }, [audioUrl]);
+    }, []);
 
     const requestPermission = useCallback(async (): Promise<boolean> => {
         try {
@@ -195,12 +235,13 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     // Forward to provider — the provider owns the single MediaRecorder.
     const startRecording = useCallback(async () => {
         setError(null);
-        setAudioBlob(null);
         if (audioUrl) {
             URL.revokeObjectURL(audioUrl);
             setAudioUrl(null);
         }
+        setAudioBlob(null);
         setDuration(0);
+        provider.clearLastCompleted();
         await provider.start("Recording");
     }, [provider, audioUrl]);
 
@@ -208,7 +249,6 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     // temp_uploads via `save_audio_blob` in its onstop handler; we do
     // not duplicate that work here.
     const stopRecording = useCallback(() => {
-        setIsPaused(false);
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
@@ -219,31 +259,15 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     }, [provider]);
 
     const pauseRecording = useCallback(() => {
-        if (providerRecording && !isPaused && mediaRecorderRef.current) {
-            mediaRecorderRef.current.pause();
-            setIsPaused(true);
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
-        }
-    }, [providerRecording, isPaused]);
+        provider.pause();
+    }, [provider]);
 
     const resumeRecording = useCallback(() => {
-        if (providerRecording && isPaused && mediaRecorderRef.current) {
-            mediaRecorderRef.current.resume();
-            setIsPaused(false);
-            if (provider.startedAt) {
-                const startMs = provider.startedAt;
-                timerRef.current = setInterval(() => {
-                    setDuration(Math.floor((Date.now() - startMs) / 1000));
-                }, 1000);
-            }
-        }
-    }, [providerRecording, isPaused, provider.startedAt]);
+        provider.resume();
+    }, [provider]);
 
     const resetRecording = useCallback(() => {
-        if (providerRecording) {
+        if (providerActive) {
             stopRecording();
         }
         if (audioUrl) {
@@ -253,8 +277,8 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         setAudioUrl(null);
         setDuration(0);
         setError(null);
-        chunksRef.current = [];
-    }, [providerRecording, stopRecording, audioUrl]);
+        provider.clearLastCompleted();
+    }, [providerActive, stopRecording, audioUrl, provider]);
 
     const openSystemMicrophoneSettings = useCallback(async () => {
         const macOSUrl = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
@@ -268,13 +292,9 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         }
     }, []);
 
-    // Touch mediaRecorderRef so lint/TS doesn't flag it as fully unused —
-    // pauseRecording / resumeRecording still reference it.
-    void mediaRecorderRef;
-
     return {
         isRecording: providerRecording,
-        isPaused,
+        isPaused: provider.status === "paused",
         duration,
         audioBlob,
         audioUrl,

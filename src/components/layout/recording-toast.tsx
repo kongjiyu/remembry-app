@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Mic, Square, X } from "lucide-react";
+import { Mic, Square, X, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRecording } from "@/components/layout/recording-provider";
 import { toast as sonnerToast } from "sonner";
+import { cn } from "@/lib/utils";
 
 function formatElapsed(ms: number): string {
     const totalSec = Math.floor(ms / 1000);
@@ -16,6 +17,7 @@ function formatElapsed(ms: number): string {
 export function RecordingToast() {
     const rec = useRecording();
     const [nowMs, setNowMs] = React.useState(0);
+    const isPaused = rec.status === "paused";
 
     // Safety-net polling: every 2s, ask the provider to re-sync from the
     // Rust backend. Catches state drift after navigation, page refresh,
@@ -36,24 +38,33 @@ export function RecordingToast() {
     }, [rec.status]);
 
     React.useEffect(() => {
-        if (rec.status !== "recording" || !rec.startedAt) return;
+        // Only tick the clock when actively recording. When paused, freeze
+        // the elapsed counter so the user sees time stop during pause.
+        if (rec.status !== "recording" || !rec.startedAt) {
+            return;
+        }
         const update = () => setNowMs(new Date().getTime());
         update();
         const id = setInterval(update, 1000);
         return () => clearInterval(id);
     }, [rec.status, rec.startedAt]);
 
-    const elapsedMs = rec.startedAt && rec.status === "recording"
+    // When paused, freeze elapsed at the moment of pause so it doesn't
+    // drift up while the user is in pause mode.
+    const elapsedMs = rec.startedAt && (rec.status === "recording" || rec.status === "paused")
         ? Math.max(0, nowMs - rec.startedAt)
         : 0;
 
+    const isActive = rec.status === "recording" || rec.status === "paused";
+
     React.useEffect(() => {
-        if (rec.status === "recording" && rec.title) {
+        if (isActive && rec.title) {
             sonnerToast.custom(
                 (toastId) => (
                     <RecordingCard
                         title={rec.title}
                         elapsed={rec.startedAt ? formatElapsed(elapsedMs) : "00:00"}
+                        isPaused={isPaused}
                         onStop={async () => {
                             try {
                                 await rec.stop();
@@ -63,6 +74,8 @@ export function RecordingToast() {
                                 sonnerToast.error("Failed to stop recording");
                             }
                         }}
+                        onPause={() => rec.pause()}
+                        onResume={() => rec.resume()}
                         onDismiss={() => sonnerToast.dismiss(toastId)}
                     />
                 ),
@@ -78,12 +91,20 @@ export function RecordingToast() {
         // elapsedMs is intentionally excluded — changes to it trigger the interval above
         // which re-renders and re-invokes this effect via nowMs dependencies.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rec.status, rec.title, rec.startedAt, nowMs, rec.stop]);
+    }, [isActive, isPaused, rec.title, rec.startedAt, nowMs, rec.stop, rec.pause, rec.resume]);
 
     return null;
 }
 
-function RecordingCard({ title, elapsed, onStop, onDismiss }: { title: string; elapsed: string; onStop: () => void; onDismiss: () => void }) {
+function RecordingCard({ title, elapsed, isPaused, onStop, onPause, onResume, onDismiss }: {
+    title: string;
+    elapsed: string;
+    isPaused: boolean;
+    onStop: () => void;
+    onPause: () => void;
+    onResume: () => void;
+    onDismiss: () => void;
+}) {
     return (
         <div className="pointer-events-auto flex w-[380px] items-start gap-3 rounded-xl border border-border/60 bg-zinc-900 px-4 py-3 text-zinc-100 shadow-2xl ring-1 ring-black/20">
             <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-500/20">
@@ -92,13 +113,34 @@ function RecordingCard({ title, elapsed, onStop, onDismiss }: { title: string; e
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                     <span className="relative flex size-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
-                        <span className="relative inline-flex size-2 rounded-full bg-red-500"></span>
+                        <span
+                            className={cn(
+                                "absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75",
+                                isPaused ? "" : "animate-ping"
+                            )}
+                        ></span>
+                        <span
+                            className={cn(
+                                "relative inline-flex size-2 rounded-full",
+                                isPaused ? "bg-amber-500" : "bg-red-500"
+                            )}
+                        ></span>
                     </span>
-                    <p className="text-sm font-medium leading-tight truncate">Recording: {title}</p>
+                    <p className="text-sm font-medium leading-tight truncate">
+                        {isPaused ? "Paused:" : "Recording:"} {title}
+                    </p>
                 </div>
                 <p className="mt-0.5 text-xs text-zinc-400 tabular-nums">{elapsed}</p>
                 <div className="mt-2 flex gap-2">
+                    {isPaused ? (
+                        <Button size="sm" variant="outline" onClick={onResume} className="h-7 text-xs bg-zinc-800 text-zinc-100 border-zinc-700 hover:bg-zinc-700 hover:text-zinc-50">
+                            <Play className="size-3 mr-1" />Resume
+                        </Button>
+                    ) : (
+                        <Button size="sm" variant="outline" onClick={onPause} className="h-7 text-xs bg-zinc-800 text-zinc-100 border-zinc-700 hover:bg-zinc-700 hover:text-zinc-50">
+                            <Pause className="size-3 mr-1" />Pause
+                        </Button>
+                    )}
                     <Button size="sm" variant="destructive" onClick={onStop} className="h-7 text-xs">
                         <Square className="size-3 mr-1" />Stop
                     </Button>
