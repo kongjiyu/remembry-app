@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useRouter } from "next/navigation";
 import { AppLink } from "@/components/ui/app-link";
 import { apiFetch } from "@/lib/apiFetch";
+import { navigateTo } from "@/lib/navigation";
 import { normalizeMeeting, buildProjectMap, countMeetingsByProject, type NormalizedMeeting } from "@/lib/meetingViews";
 import {
     DropdownMenu,
@@ -242,7 +243,12 @@ export default function ProjectsPage() {
                             const eventCount = getEventCount(project.id);
 
                             return (
-                                <Card key={project.id} className="hover:shadow-md transition-shadow">
+                                <AppLink
+                                    key={project.id}
+                                    href={`/projects/detail?id=${encodeURIComponent(project.id)}`}
+                                    className="block"
+                                >
+                                <Card className="hover:shadow-md hover:border-primary/50 transition-all cursor-pointer h-full">
                                     <CardHeader>
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-center gap-3">
@@ -290,22 +296,29 @@ export default function ProjectsPage() {
                                                 <Badge className="bg-success/10 text-success border-success/20">Active</Badge>
                                             </div>
                                             <div className="pt-2">
-                                                <Button asChild className="w-full" variant={eventCount === 0 ? "default" : "outline"}>
-                                                    <AppLink href={eventCount === 0 ? `/events/new` : `/projects/detail?id=${encodeURIComponent(project.id)}`}>
-                                                        {eventCount === 0 ? (
-                                                            <>
-                                                                <Plus className="size-4 mr-2" />
-                                                                Upload Recording
-                                                            </>
-                                                        ) : (
-                                                            'View Details'
-                                                        )}
-                                                    </AppLink>
+                                                <Button
+                                                    className="w-full"
+                                                    variant={eventCount === 0 ? "default" : "outline"}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        navigateTo(eventCount === 0 ? `/events/new` : `/projects/detail?id=${encodeURIComponent(project.id)}`);
+                                                    }}
+                                                >
+                                                    {eventCount === 0 ? (
+                                                        <>
+                                                            <Plus className="size-4 mr-2" />
+                                                            Upload Recording
+                                                        </>
+                                                    ) : (
+                                                        'View Details'
+                                                    )}
                                                 </Button>
                                             </div>
                                         </div>
                                     </CardContent>
                                 </Card>
+                                </AppLink>
                             );
                         })}
                     </div>
