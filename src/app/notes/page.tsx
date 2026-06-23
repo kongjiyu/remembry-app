@@ -24,7 +24,6 @@ export default function NotesPage() {
     const [projects, setProjects] = React.useState<Project[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [search, setSearch] = React.useState("");
-    const [projectFilter, setProjectFilter] = React.useState<string>("");
     const [showNew, setShowNew] = React.useState(false);
 
     const fetchAll = React.useCallback(async () => {
@@ -45,9 +44,8 @@ export default function NotesPage() {
     const projectMap = React.useMemo(() => Object.fromEntries(projects.map(p => [p.id, p.display_name])), [projects]);
 
     const filtered = notes.filter(n =>
-        (!projectFilter || n.project_id === projectFilter) &&
-        (n.display_name.toLowerCase().includes(search.toLowerCase()) ||
-         n.content.toLowerCase().includes(search.toLowerCase()))
+        n.display_name.toLowerCase().includes(search.toLowerCase()) ||
+        n.content.toLowerCase().includes(search.toLowerCase())
     );
 
     return (
@@ -58,15 +56,6 @@ export default function NotesPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search notes..." className="pl-9" />
                     </div>
-                    <select
-                        value={projectFilter}
-                        onChange={(e) => setProjectFilter(e.target.value)}
-                        className="h-9 rounded-md border border-input bg-background px-3 text-sm w-[200px]"
-                        aria-label="Filter notes by project"
-                    >
-                        <option value="">Filter by project...</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)}
-                    </select>
                     <Button onClick={() => setShowNew(true)}><Plus className="size-4 mr-1" />New Note</Button>
                 </div>
 
