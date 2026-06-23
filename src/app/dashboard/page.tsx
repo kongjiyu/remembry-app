@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,9 @@ import { UploadJobsBanner } from "@/components/ui/upload-jobs-banner";
 import { AppLink } from "@/components/ui/app-link";
 import { navigateTo } from "@/lib/navigation";
 import {
-    Mic, FileText, CheckCircle2, Upload,
+    Mic, CheckCircle2, Upload,
     FolderKanban, Plus,
-    Search, ArrowRight, Sparkles, Calendar
+    Search, ArrowRight, Sparkles, Calendar, NotebookPen
 } from "lucide-react";
 
 interface Project {
@@ -40,9 +40,21 @@ interface Meeting {
     available_languages?: string[];
 }
 
+interface Note {
+    id: string;
+    display_name: string;
+    project_id: string;
+    created_at: string;
+}
+
+type ActivityItem =
+    | { kind: 'event'; id: string; title: string; date: number; projectDisplayName: string; meeting: NormalizedMeeting }
+    | { kind: 'note'; id: string; title: string; date: number; projectDisplayName: string };
+
 export default function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [meetings, setMeetings] = useState<NormalizedMeeting[]>([]);
+    const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
     const [dashboardQuestion, setDashboardQuestion] = useState("");
     const [selectedAskProjectId, setSelectedAskProjectId] = useState<string>("");
@@ -50,18 +62,21 @@ export default function DashboardPage() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [projectsRes, meetingsRes] = await Promise.all([
+            const [projectsRes, meetingsRes, notesRes] = await Promise.all([
                 apiFetch('/api/projects'),
                 apiFetch('/api/meetings'),
+                apiFetch('/api/documents'),
             ]);
             const projectsJson = projectsRes.ok ? await projectsRes.json() : {};
             const meetingsJson = meetingsRes.ok ? await meetingsRes.json() : {};
+            const notesJson = notesRes.ok ? await notesRes.json() : {};
             const projectsData = projectsJson.projects || [];
             const rawMeetings: Record<string, unknown>[] = meetingsJson.meetings || [];
             const projectMap = buildProjectMap(projectsData);
             const normalizedMeetings = rawMeetings.map((m: Record<string, unknown>) => normalizeMeeting(m, projectMap));
             setProjects(projectsData);
             setMeetings(normalizedMeetings);
+            setNotes(Array.isArray(notesJson) ? notesJson : (notesJson.documents || []));
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -110,6 +125,33 @@ export default function DashboardPage() {
             const timeB = new Date(b.uploadTime || 0).getTime();
             return timeB - timeA;
         })
+        .slice(0, 5);
+
+    const projectNameById = useMemo(
+        () => Object.fromEntries(projects.map(p => [p.id, p.display_name as string])),
+        [projects]
+    );
+
+    const recentActivity: ActivityItem[] = [
+        ...recentMeetingsList.map<ActivityItem>(m => ({
+            kind: 'event',
+            id: m.id,
+            title: m.displayName,
+            date: m.uploadTime ? new Date(m.uploadTime).getTime() : 0,
+            projectDisplayName: m.projectDisplayName || '',
+            meeting: m,
+        })),
+        ...notes
+            .filter(n => n.display_name && !n.display_name.startsWith('project-'))
+            .map<ActivityItem>(n => ({
+                kind: 'note',
+                id: n.id,
+                title: n.display_name,
+                date: n.created_at ? new Date(n.created_at).getTime() : 0,
+                projectDisplayName: projectNameById[n.project_id] || '',
+            })),
+    ]
+        .sort((a, b) => b.date - a.date)
         .slice(0, 5);
 
     const recentProjectsList = projects.slice(0, 3);
@@ -308,7 +350,7 @@ export default function DashboardPage() {
                     </Card>
                 </div>
 
-                {/* RECENT EVENTS */}
+                {/* RECENT ACTIVITY */}
                 <div className="col-span-1 md:col-span-12">
                     <Card className="border-none shadow-sm bg-card/50 backdrop-blur-xl">
                         <CardHeader className="flex flex-row items-center justify-between">
@@ -324,43 +366,63 @@ export default function DashboardPage() {
                             <div className="space-y-2">
                                 {loading ? (
                                     <div className="text-center py-8 text-muted-foreground">Loading...</div>
-                                ) : recentMeetingsList.length === 0 ? (
+                                ) : recentActivity.length === 0 ? (
                                     <div className="text-center py-12 border-2 border-dashed rounded-xl border-muted/50">
                                         <div className="flex flex-col items-center gap-2">
                                             <Mic className="size-8 text-muted-foreground/50" />
-                                            <p className="text-muted-foreground font-medium">No recent events</p>
+                                            <p className="text-muted-foreground font-medium">No recent activity</p>
                                         </div>
                                     </div>
                                 ) : (
-                                    recentMeetingsList.map((meeting) => (
-                                        <AppLink
-                                            key={meeting.id}
-                                            href={`/events/detail?id=${encodeURIComponent(meeting.id)}&projectName=${encodeURIComponent(meeting.project_id)}&displayName=${encodeURIComponent(meeting.projectDisplayName || '')}`}
-                                            className="group flex items-center justify-between p-4 rounded-xl hover:bg-muted/50 transition-all duration-200 border border-transparent hover:border-border/50 min-w-0"
-                                        >
-                                            <div className="flex items-center gap-4 min-w-0 flex-1">
-                                                <div className="size-10 rounded-full bg-secondary flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
-                                                    <FileText className="size-5 text-secondary-foreground" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium group-hover:text-primary transition-colors break-words">
-                                                        {meeting.displayName}
-                                                    </h4>
-                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                        <span className="flex items-center gap-1 flex-shrink-0">
-                                                            <Calendar className="size-3" />
-                                                            {meeting.uploadTime ? new Date(meeting.uploadTime).toLocaleDateString() : 'Unknown'}
-                                                        </span>
-                                                        <span className="flex-shrink-0">•</span>
-                                                        <span className="break-words min-w-0">{meeting.projectDisplayName}</span>
+                                    recentActivity.map((item) => {
+                                        const isNote = item.kind === 'note';
+                                        const href = isNote
+                                            ? `/notes/detail?id=${encodeURIComponent(item.id)}`
+                                            : `/events/detail?id=${encodeURIComponent(item.id)}&projectName=${encodeURIComponent(item.meeting.project_id)}&displayName=${encodeURIComponent(item.meeting.projectDisplayName || '')}`;
+                                        return (
+                                            <AppLink
+                                                key={`${item.kind}-${item.id}`}
+                                                href={href}
+                                                className="group flex items-center justify-between p-4 rounded-xl hover:bg-muted/50 transition-all duration-200 border border-transparent hover:border-border/50 min-w-0"
+                                            >
+                                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                    <div className={
+                                                        isNote
+                                                            ? "size-10 rounded-full bg-violet-500/10 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0"
+                                                            : "size-10 rounded-full bg-secondary flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0"
+                                                    }>
+                                                        {isNote ? (
+                                                            <NotebookPen className="size-5 text-violet-500" />
+                                                        ) : (
+                                                            <Mic className="size-5 text-secondary-foreground" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-medium group-hover:text-primary transition-colors break-words">
+                                                            {item.title}
+                                                        </h4>
+                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                            <span className="flex items-center gap-1 flex-shrink-0">
+                                                                <Calendar className="size-3" />
+                                                                {item.date ? new Date(item.date).toLocaleDateString() : 'Unknown'}
+                                                            </span>
+                                                            <span className="flex-shrink-0">•</span>
+                                                            <span className="break-words min-w-0">{item.projectDisplayName}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 group-hover:bg-emerald-500/10 transition-colors flex-shrink-0">
-                                                Processed
-                                            </Badge>
-                                        </AppLink>
-                                    ))
+                                                {isNote ? (
+                                                    <Badge variant="outline" className="bg-violet-500/5 text-violet-600 border-violet-500/20 group-hover:bg-violet-500/10 transition-colors flex-shrink-0">
+                                                        Note
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 group-hover:bg-emerald-500/10 transition-colors flex-shrink-0">
+                                                        Processed
+                                                    </Badge>
+                                                )}
+                                            </AppLink>
+                                        );
+                                    })
                                 )}
                             </div>
                         </CardContent>
