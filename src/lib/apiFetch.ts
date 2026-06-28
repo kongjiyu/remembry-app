@@ -112,6 +112,11 @@ const TAURI_COMMANDS: TauriCommandEntry[] = [
   { pattern: "/api/settings/gemini-key", method: "GET", command: "get_gemini_key_status", extractParams: () => ({}) },
   { pattern: "/api/settings/gemini-key", method: "POST", command: "save_gemini_key", extractParams: (_, __, body) => ({ apiKey: (body as { apiKey?: string })?.apiKey || "" }) },
   { pattern: "/api/settings/gemini-key", method: "DELETE", command: "delete_gemini_key", extractParams: () => ({}) },
+  { pattern: "/api/groq/key", method: "GET", command: "get_groq_key_status", extractParams: () => ({}) },
+  { pattern: "/api/groq/key", method: "POST", command: "save_groq_key", extractParams: (_, __, body) => ({ apiKey: (body as { apiKey?: string })?.apiKey || "" }) },
+  { pattern: "/api/groq/key", method: "DELETE", command: "delete_groq_key", extractParams: () => ({}) },
+  { pattern: "/api/providers/config", method: "GET", command: "get_provider_config", extractParams: () => ({}) },
+  { pattern: "/api/providers/config", method: "POST", command: "save_provider_config", extractParams: (_, __, body) => ({ config: body }) },
   { pattern: "/api/audio/download", method: "POST", command: "download_audio", extractParams: (_, __, body) => {
     const b = body as { sourcePath?: string; suggestedFilename?: string } | null;
     return { sourcePath: b?.sourcePath || "", suggestedFilename: b?.suggestedFilename || null };

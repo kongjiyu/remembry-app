@@ -4,7 +4,9 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Palette, Moon, Sun, Monitor, KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink, Copy, Trash2, Eye, EyeOff, RefreshCw, Download } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Palette, Moon, Sun, Monitor, KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink, Copy, Trash2, Eye, EyeOff, RefreshCw, Download, Cpu } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -51,6 +53,44 @@ async function deleteGeminiKey(): Promise<void> {
     await invoke("delete_gemini_key");
 }
 
+interface GroqKeyStatus {
+    hasKey: boolean;
+    maskedKey: string | null;
+    keyPrefix: string | null;
+    keySuffix: string | null;
+}
+
+async function loadGroqKeyStatus(): Promise<GroqKeyStatus> {
+    return invoke<GroqKeyStatus>("get_groq_key_status");
+}
+
+async function saveGroqKey(apiKey: string): Promise<void> {
+    await invoke("save_groq_key", { apiKey });
+}
+
+async function deleteGroqKey(): Promise<void> {
+    await invoke("delete_groq_key");
+}
+
+interface ProviderConfig {
+    transcription: "groq" | "gemini";
+    extraction: "groq" | "openai_compatible" | "gemini";
+    groq_transcription_model: "whisper_large_v3" | "whisper_large_v3_turbo";
+    groq_extraction_model: "llama_33_70b" | "llama_4_scout" | "qwen_3_32b" | "gpt_oss_120b";
+    custom_base_url: string | null;
+    custom_model: string | null;
+    groq_api_key?: string | null;
+    custom_api_key?: string | null;
+}
+
+async function loadProviderConfig(): Promise<ProviderConfig> {
+    return invoke<ProviderConfig>("get_provider_config");
+}
+
+async function saveProviderConfig(config: ProviderConfig): Promise<void> {
+    await invoke("save_provider_config", { config });
+}
+
 export default function SettingsPage() {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
@@ -65,6 +105,13 @@ export default function SettingsPage() {
     const [updateProgress, setUpdateProgress] = useState(0);
     const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
     const [appVersion, setAppVersion] = useState<string>("");
+    const [groqKey, setGroqKey] = useState("");
+    const [groqKeyStatus, setGroqKeyStatus] = useState<GroqKeyStatus | null>(null);
+    const [isSavingGroqKey, setIsSavingGroqKey] = useState(false);
+    const [isDeletingGroqKey, setIsDeletingGroqKey] = useState(false);
+    const [showGroqKey, setShowGroqKey] = useState(false);
+    const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
 
     useEffect(() => {
         setMounted(true);
@@ -102,6 +149,22 @@ export default function SettingsPage() {
         };
 
         refreshGeminiKeyStatus();
+    }, []);
+
+    useEffect(() => {
+        const refreshProviderData = async () => {
+            try {
+                const [cfg, groqStatus] = await Promise.all([
+                    loadProviderConfig(),
+                    loadGroqKeyStatus(),
+                ]);
+                setProviderConfig(cfg);
+                setGroqKeyStatus(groqStatus);
+            } catch (error) {
+                console.error("Failed to load provider config:", error);
+            }
+        };
+        refreshProviderData();
     }, []);
 
     const handleSaveApiKey = async () => {
@@ -152,6 +215,72 @@ export default function SettingsPage() {
             toast.error("Failed to delete API key.");
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleSaveGroqKey = async () => {
+        const trimmed = groqKey.trim();
+        if (!trimmed) {
+            toast.error("Please enter a Groq API key.");
+            return;
+        }
+        if (!trimmed.startsWith("gsk_")) {
+            toast.error("Invalid Groq API key format. Keys start with 'gsk_'.");
+            return;
+        }
+        setIsSavingGroqKey(true);
+        try {
+            await saveGroqKey(trimmed);
+            const status = await loadGroqKeyStatus();
+            setGroqKeyStatus(status);
+            setGroqKey("");
+            toast.success("Groq API key saved.");
+        } catch (error) {
+            console.error("Failed to save Groq API key:", error);
+            toast.error(getErrorMessage(error, "Failed to save Groq key"));
+        } finally {
+            setIsSavingGroqKey(false);
+        }
+    };
+
+    const handleDeleteGroqKey = async () => {
+        setIsDeletingGroqKey(true);
+        try {
+            await deleteGroqKey();
+            setGroqKeyStatus({ hasKey: false, maskedKey: null, keyPrefix: null, keySuffix: null });
+            toast.success("Groq API key deleted.");
+        } catch (error) {
+            console.error("Failed to delete Groq key:", error);
+            toast.error("Failed to delete Groq API key.");
+        } finally {
+            setIsDeletingGroqKey(false);
+        }
+    };
+
+    const handleSaveProviderConfig = async () => {
+        if (!providerConfig) return;
+        setIsSavingConfig(true);
+        try {
+            // Embed any in-progress Groq key input so the backend writes it to the keyring.
+            const trimmedGroq = groqKey.trim();
+            const toSave: ProviderConfig = {
+                ...providerConfig,
+                groq_api_key: trimmedGroq || null,
+            };
+            await saveProviderConfig(toSave);
+            const [cfg, groqStatus] = await Promise.all([
+                loadProviderConfig(),
+                loadGroqKeyStatus(),
+            ]);
+            setProviderConfig(cfg);
+            setGroqKeyStatus(groqStatus);
+            setGroqKey("");
+            toast.success("Provider settings saved.");
+        } catch (error) {
+            console.error("Failed to save provider config:", error);
+            toast.error(getErrorMessage(error, "Failed to save provider settings"));
+        } finally {
+            setIsSavingConfig(false);
         }
     };
 
@@ -310,6 +439,241 @@ export default function SettingsPage() {
                                 </Button>
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
+
+                {/* AI Providers */}
+                <Card className="border-none shadow-sm bg-card/50 backdrop-blur-xl">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                    <Cpu className="size-5" />
+                                </div>
+                                <div>
+                                    <CardTitle>AI Providers</CardTitle>
+                                    <CardDescription>
+                                        Choose which backend powers transcription and extraction
+                                    </CardDescription>
+                                </div>
+                            </div>
+                            <Badge variant={providerConfig ? "default" : "secondary"} className="px-3 py-1">
+                                {providerConfig ? (
+                                    <span className="flex items-center gap-1">
+                                        <CheckCircle2 className="size-3" /> Loaded
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1">
+                                        <Loader2 className="size-3 animate-spin" /> Loading
+                                    </span>
+                                )}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {providerConfig && (
+                            <>
+                                {/* Transcription */}
+                                <div className="space-y-2">
+                                    <Label>Transcription Provider</Label>
+                                    <Select
+                                        value={providerConfig.transcription}
+                                        onValueChange={(v) =>
+                                            setProviderConfig({ ...providerConfig, transcription: v as "groq" | "gemini" })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="groq">Groq Whisper (Free)</SelectItem>
+                                            <SelectItem value="gemini">Gemini (Fallback)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {providerConfig.transcription === "groq" && (
+                                    <div className="space-y-2">
+                                        <Label>Whisper Model</Label>
+                                        <Select
+                                            value={providerConfig.groq_transcription_model}
+                                            onValueChange={(v) =>
+                                                setProviderConfig({
+                                                    ...providerConfig,
+                                                    groq_transcription_model: v as "whisper_large_v3" | "whisper_large_v3_turbo",
+                                                })
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="whisper_large_v3">whisper-large-v3 (Best quality)</SelectItem>
+                                                <SelectItem value="whisper_large_v3_turbo">whisper-large-v3-turbo (Fastest)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                {/* Extraction */}
+                                <div className="space-y-2">
+                                    <Label>Extraction Provider</Label>
+                                    <Select
+                                        value={providerConfig.extraction}
+                                        onValueChange={(v) =>
+                                            setProviderConfig({
+                                                ...providerConfig,
+                                                extraction: v as "groq" | "openai_compatible" | "gemini",
+                                            })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="groq">Groq LLM (Free)</SelectItem>
+                                            <SelectItem value="openai_compatible">Custom Provider (OpenAI-compatible)</SelectItem>
+                                            <SelectItem value="gemini">Gemini (Fallback)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {providerConfig.extraction === "groq" && (
+                                    <div className="space-y-2">
+                                        <Label>Extraction Model</Label>
+                                        <Select
+                                            value={providerConfig.groq_extraction_model}
+                                            onValueChange={(v) =>
+                                                setProviderConfig({
+                                                    ...providerConfig,
+                                                    groq_extraction_model: v as ProviderConfig["groq_extraction_model"],
+                                                })
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="llama_33_70b">Llama 3.3 70B (Best)</SelectItem>
+                                                <SelectItem value="llama_4_scout">Llama 4 Scout</SelectItem>
+                                                <SelectItem value="qwen_3_32b">Qwen 3 32B</SelectItem>
+                                                <SelectItem value="gpt_oss_120b">GPT OSS 120B</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                {providerConfig.extraction === "openai_compatible" && (
+                                    <div className="space-y-4 rounded-lg border p-4">
+                                        <div className="space-y-2">
+                                            <Label>Base URL</Label>
+                                            <Input
+                                                placeholder="https://api.example.com/v1"
+                                                value={providerConfig.custom_base_url ?? ""}
+                                                onChange={(e) =>
+                                                    setProviderConfig({
+                                                        ...providerConfig,
+                                                        custom_base_url: e.target.value || null,
+                                                    })
+                                                }
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Presets: OpenCode Go (opencode.ai/zen/go/v1) · DeepSeek (api.deepseek.com) · OpenRouter (openrouter.ai/api/v1)
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Model Name</Label>
+                                            <Input
+                                                placeholder="deepseek-chat"
+                                                value={providerConfig.custom_model ?? ""}
+                                                onChange={(e) =>
+                                                    setProviderConfig({
+                                                        ...providerConfig,
+                                                        custom_model: e.target.value || null,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Groq Key input — always available when Groq is in use */}
+                                {(providerConfig.transcription === "groq" || providerConfig.extraction === "groq") && (
+                                    <div className="space-y-2 rounded-lg border p-4">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Groq API Key</Label>
+                                            <Badge variant={groqKeyStatus?.hasKey ? "default" : "secondary"} className="px-2 py-0.5 text-xs">
+                                                {groqKeyStatus?.hasKey ? "Configured" : "Not Set"}
+                                            </Badge>
+                                        </div>
+                                        <div className="relative">
+                                            <Input
+                                                type={showGroqKey ? "text" : "password"}
+                                                placeholder="gsk_..."
+                                                value={groqKey}
+                                                onChange={(e) => setGroqKey(e.target.value)}
+                                                autoComplete="off"
+                                                className="pr-20"
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 px-2"
+                                                onClick={() => setShowGroqKey(!showGroqKey)}
+                                            >
+                                                {showGroqKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                            </Button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                size="sm"
+                                                onClick={handleSaveGroqKey}
+                                                disabled={isSavingGroqKey || !groqKey.trim()}
+                                            >
+                                                {isSavingGroqKey ? (
+                                                    <Loader2 className="size-4 mr-1 animate-spin" />
+                                                ) : (
+                                                    <CheckCircle2 className="size-4 mr-1" />
+                                                )}
+                                                Save Groq Key
+                                            </Button>
+                                            {groqKeyStatus?.hasKey && (
+                                                <Button
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    onClick={handleDeleteGroqKey}
+                                                    disabled={isDeletingGroqKey}
+                                                >
+                                                    {isDeletingGroqKey ? (
+                                                        <Loader2 className="size-4 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="size-4" />
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline">console.groq.com/keys</a>.
+                                            Saved to OS credential store.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Save the full config (which includes any embedded key) */}
+                                <Button
+                                    onClick={handleSaveProviderConfig}
+                                    disabled={isSavingConfig}
+                                    className="w-full"
+                                >
+                                    {isSavingConfig ? (
+                                        <Loader2 className="size-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <CheckCircle2 className="size-4 mr-2" />
+                                    )}
+                                    Save Provider Settings
+                                </Button>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
 
