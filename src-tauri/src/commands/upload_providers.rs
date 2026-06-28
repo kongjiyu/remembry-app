@@ -166,7 +166,7 @@ pub fn load_provider_config() -> ProviderConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::providers::{ExtractionModel, TranscriptionModel};
+    use crate::providers::ExtractionModel;
 
     #[test]
     fn groq_extraction_model_lookup_matches_config() {

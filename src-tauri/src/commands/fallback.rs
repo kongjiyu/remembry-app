@@ -176,7 +176,6 @@ pub async fn extract_event_knowledge_with_fallback(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::providers::{
         ExtractionProviderType, ProviderConfig, TranscriptionProviderType,
     };
