@@ -1,55 +1,22 @@
 //! Gemini generateContent — transcription and note extraction.
+//!
+//! Prompt construction now lives in `crate::prompts` so the same strings
+//! can be reused by any LLM provider. This module only owns the Gemini
+//! wire-format details (REST URL, JSON body shape, response parsing).
 
 use crate::db::{TranscriptionResult, MeetingNotes, EventKnowledge};
-use crate::gemini::{GeminiClient, retry_with_backoff, is_retryable_error, sanitize_api_key_from_error, format_gemini_error};
+use crate::gemini::{GeminiClient, retry_with_backoff, is_retryable_error, format_reqwest_error, format_gemini_error};
 use serde::Deserialize;
 
 const TRANSCRIPTION_MODEL: &str = "gemini-3-flash-preview";
 const EXTRACTION_MODEL: &str = "gemini-3-flash-preview";
 
-/// Extract the first complete JSON object from a Gemini response text.
-///
-/// Uses brace-depth scanning to correctly handle:
-/// - Strings containing `{` or `}` (escaped or unescaped)
-/// - Nested objects
-/// - HTML tags like `<code>{ ... }</code>` or `{ ... }</code>` after the JSON
-///
-/// Returns `None` if no opening `{` is found or the braces are unbalanced.
-fn extract_json_from_response(text: &str) -> Option<String> {
-    let start = text.find('{')?;
-    let bytes = text[start..].as_bytes();
-
-    let mut depth = 0i32;
-    let mut in_string = false;
-    let mut escaped = false;
-
-    for (i, &byte) in bytes.iter().enumerate() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match byte {
-            b'\\' if in_string => {
-                escaped = true;
-            }
-            b'"' => {
-                in_string = !in_string;
-            }
-            b'{' if !in_string => {
-                depth += 1;
-            }
-            b'}' if !in_string => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(text[start..start + i + 1].to_string());
-                }
-            }
-            _ => {}
-        }
-    }
-
-    None
+/// Back-compat re-export. The real implementation moved to `crate::prompts`.
+/// Existing tests reference `super::extract_json_from_response`; we keep the
+/// symbol alive so they don't need to be edited.
+#[inline]
+pub(crate) fn extract_json_from_response(text: &str) -> Option<String> {
+    crate::prompts::extract_json_object(text)
 }
 
 #[cfg(test)]
@@ -164,41 +131,7 @@ pub async fn extract_meeting_notes(
     context: &str,
     language: &str,
 ) -> Result<MeetingNotes, String> {
-    let lang_instruction = match language {
-        "zh" | "chinese" => "Respond in Chinese (Simplified).",
-        "ja" | "japanese" => "Respond in Japanese.",
-        "ko" | "korean" => "Respond in Korean.",
-        "es" | "spanish" => "Respond in Spanish.",
-        "fr" | "french" => "Respond in French.",
-        "de" | "german" => "Respond in German.",
-        _ => "Respond in English.",
-    };
-
-    let prompt = format!(
-        r#"You are an AI assistant that analyzes meeting transcripts and extracts structured notes.
-
-Context about this meeting: {}
-
-Return raw JSON only. Do not wrap it in markdown, HTML, XML, or code tags.
-
-{{
-  "summary": "A 2-3 sentence concise summary of the meeting",
-  "action_items": [
-    {{ "task": "Description of the task", "assignee": "Name of person responsible (or null)", "due_date": "Due date if mentioned (or null)" }}
-  ],
-  "decisions": ["Decision 1", "Decision 2"],
-  "questions_and_answers": [
-    {{ "question": "Question asked", "answer": "Answer given" }}
-  ],
-  "key_points": ["Key point 1", "Key point 2", "Key point 3"]
-}}
-
-Transcript:
-{}
-
-{}"#,
-        context, transcription, lang_instruction
-    );
+    let prompt = crate::prompts::meeting_notes_prompt(transcription, context, language);
 
     let request_body = serde_json::json!({
         "contents": [{
@@ -233,98 +166,8 @@ pub async fn extract_event_knowledge(
     event_tags: &[String],
     language: &str,
 ) -> Result<EventKnowledge, String> {
-    let lang_instruction = match language {
-        "zh" | "chinese" => "Respond in Chinese (Simplified).",
-        "ja" | "japanese" => "Respond in Japanese.",
-        "ko" | "korean" => "Respond in Korean.",
-        "es" | "spanish" => "Respond in Spanish.",
-        "fr" | "french" => "Respond in French.",
-        "de" | "german" => "Respond in German.",
-        _ => "Respond in English.",
-    };
-
-    let tags_hint = if event_tags.is_empty() {
-        String::new()
-    } else {
-        format!("\nEvent tags to guide extraction: {}.\n", event_tags.join(", "))
-    };
-
-    let event_type_hint = format!(
-        "\nEvent type: '{}'. Adapt extraction to focus on {} specific patterns.\n",
-        event_type,
-        event_type
-    );
-
-    let prompt = format!(
-        r#"You are an AI assistant that analyzes transcripts and extracts structured event knowledge.
-
-Context about this event: {}
-
-Event type: '{}'{}
-Return raw JSON only. Do not wrap it in markdown, HTML, XML, or code tags.
-
-Tags are important: use meaningful, reusable tags that can link related items together. When an item has a clear topic, assign at least one non-empty tag. Keep tags consistent across items so the frontend can surface related concepts, observations, insights, and references by tag matching.
-
-Provide 3-5 key_points only — short overview bullets for quick scanning, 1-2 sentences each. Do not include more.
-
-{{
-  "schema_version": 1,
-  "event_type": "{}",
-  "title": "A short descriptive title for this event",
-  "summary": "A 2-3 sentence concise summary of the event",
-  "concepts": [
-    {{
-      "id": "concept_{{canonical_name}}",
-      "type": "concept",
-      "content": "Description of the concept from the transcript",
-      "canonical_name": "snake_case_normalized_name",
-      "title": "Human-readable title",
-      "aliases": ["alias1", "alias2"],
-      "description": "Brief description",
-      "confidence": 0.95,
-      "evidence": [{{ "snippet": "Relevant quote from transcript", "speaker": "Speaker name if available" }}],
-      "tags": ["roadmap", "performance"]
-    }}
-  ],
-  "key_points": [
-    {{ "id": "kp_1", "type": "observation", "content": "Short overview bullet — 1-2 sentences for quick scanning", "confidence": 0.9, "evidence": [{{ "snippet": "Quote" }}], "tags": [] }}
-  ],
-  "insights": [
-    {{ "id": "insight_1", "type": "insight", "content": "Key insight or discovery", "confidence": 0.85, "evidence": [{{ "snippet": "Quote" }}], "tags": ["user_feedback", "roadmap"] }}
-  ],
-  "questions": [
-    {{ "id": "q_1", "type": "question", "content": "Question raised", "status": "open", "evidence": [{{ "snippet": "Quote" }}], "tags": ["performance", "roadmap"] }}
-  ],
-  "decisions": [
-    {{ "id": "d_1", "type": "decision", "content": "Decision made", "evidence": [{{ "snippet": "Quote", "speaker": "Who made this decision" }}], "tags": ["roadmap"] }}
-  ],
-  "action_items": [
-    {{ "id": "task_1", "type": "task", "content": "Action item description", "assignee": "Person responsible or null", "due_date": "YYYY-MM-DD or null", "evidence": [{{ "snippet": "Quote" }}], "tags": ["user_feedback"] }}
-  ],
-  "observations": [
-    {{ "id": "obs_1", "type": "observation", "subtype": "balancing_issue", "content": "Observational detail", "evidence": [{{ "snippet": "Quote" }}], "tags": ["performance", "user_feedback"] }}
-  ],
-  "references": [
-    {{ "id": "ref_1", "type": "reference", "content": "Reference or resource mentioned", "evidence": [{{ "snippet": "Quote" }}], "tags": ["roadmap", "performance"] }}
-  ],
-  "related_topics": ["topic1", "topic2"],
-  "sentiment": {{
-    "overall": "positive|neutral|negative|mixed",
-    "important_emotions": ["satisfaction", "frustration"]
-  }}
-}}
-
-Transcript:
-{}
-
-{}{}"#,
-        context,
-        event_type,
-        tags_hint,
-        event_type,
-        transcription,
-        lang_instruction,
-        event_type_hint
+    let prompt = crate::prompts::event_knowledge_prompt(
+        transcription, context, event_type, event_tags, language,
     );
 
     let request_body = serde_json::json!({
@@ -364,7 +207,11 @@ async fn send_generate_request(
             .json(&body)
             .send()
             .await
-            .map_err(|e| format!("generateContent request failed: {}", sanitize_api_key_from_error(&e.to_string())))?;
+            .map_err(|e| {
+                let msg = format_reqwest_error("generateContent request failed", &e);
+                log::error!("[Gemini] generateContent transport error: {}", msg);
+                msg
+            })?;
 
         let status = response.status();
         if status == reqwest::StatusCode::BAD_REQUEST {

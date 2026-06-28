@@ -4,6 +4,10 @@ mod db;
 mod secrets;
 mod gemini;
 mod uploads;
+mod prompts;
+pub mod llm;
+pub mod transcription;
+pub mod providers;
 pub mod commands;
 mod api;
 
@@ -201,6 +205,11 @@ pub fn run() {
             commands::gemini_key::get_gemini_key_status,
             commands::gemini_key::save_gemini_key,
             commands::gemini_key::delete_gemini_key,
+            commands::groq_key::get_groq_key_status,
+            commands::groq_key::save_groq_key,
+            commands::groq_key::delete_groq_key,
+            commands::providers::get_provider_config,
+            commands::providers::save_provider_config,
             commands::uploads::start_upload,
             commands::uploads::append_upload_chunk,
             commands::uploads::process_meeting_upload,

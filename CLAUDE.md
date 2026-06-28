@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Remembry** is an AI-powered desktop application that transforms audio recordings into structured, searchable notes. Built with Tauri (Rust backend) and Next.js 16 (React frontend), it uses Gemini AI for transcription and extraction, and SQLite for local storage.
+**Remembry** is an AI-powered desktop application that transforms audio recordings into structured, searchable notes. Built with Tauri (Rust backend) and Next.js 16 (React frontend), it uses a pluggable multi-provider AI backend (Groq Whisper, OpenAI-compatible LLMs, Gemini fallback) for transcription and extraction, and SQLite for local storage.
 
 ## Tech Stack
 
 - **Desktop Runtime**: Tauri 2.x (Rust backend + WebView frontend)
 - **Frontend**: Next.js 16, React 19, Tailwind CSS v4, shadcn/ui (Radix UI)
-- **AI**: Google Gemini 3 Flash (`gemini-3-flash-preview`) via `@google/genai` (Rust)
+- **AI**: Pluggable providers — Groq Whisper (transcription), Groq Llama 3.3 70B / custom OpenAI-compatible / Gemini fallback (extraction)
 - **Database**: SQLite via `rusqlite` (local storage, no cloud)
 - **Styling**: Tailwind CSS + CSS variables (no `tailwind.config.js` - configured via CSS)
 
@@ -44,7 +44,11 @@ All data operations go through Tauri commands registered in `src-tauri/src/`:
 | `get_gemini_key_status` | Check if Gemini API key is configured |
 | `save_gemini_key` | Save Gemini API key |
 | `delete_gemini_key` | Delete Gemini API key |
-| `upload_audio` | Upload audio file and start processing |
+| `get_groq_key_status` | Check if Groq API key is configured |
+| `save_groq_key` | Save Groq API key |
+| `delete_groq_key` | Delete Groq API key |
+| `get_provider_config` | Read active provider configuration (transcription + extraction backends, model choices) |
+| `save_provider_config` | Persist provider config; embeds API keys for the keyring write |
 
 ### API Fetch Layer (`src/lib/apiFetch.ts`)
 
@@ -56,10 +60,40 @@ All frontend code uses `apiFetch('/api/...')` which maps to Tauri commands:
 
 ### AI Processing Pipeline (Rust)
 
-The Gemini AI processing lives in `src-tauri/src/gemini.rs`:
-- **Transcription**: uploads audio to Gemini Files API, polls, then transcribes
-- **Notes Extraction**: generates structured JSON with summary, action items, decisions, Q&A
-- **Retry Logic**: exponential backoff for rate limits (429), network errors, 500s
+The AI processing is split across provider modules:
+
+- **`src-tauri/src/providers/`** — `ProviderConfig` and provider enums. Persisted as JSON in `data_local_dir()/remembry/providers.json`.
+- **`src-tauri/src/transcription/`** — `Provider` enum with a `Groq(GroqWhisper)` variant. POSTs multipart audio to Groq's `/audio/transcriptions` endpoint.
+- **`src-tauri/src/llm/`** — Generic `LlmClient` for any OpenAI-compatible chat-completion API (Groq, OpenCode Go, DeepSeek, OpenRouter, custom). Includes `extract_json()` convenience method.
+- **`src-tauri/src/gemini/`** — Existing Gemini REST client (Files API upload + generateContent). Remains as fallback.
+- **`src-tauri/src/commands/upload_providers.rs`** — `transcribe_with_provider`, `extract_meeting_notes_with_provider`, `extract_event_knowledge_with_provider`. The dispatchers the upload pipeline calls through.
+- **`src-tauri/src/commands/fallback.rs`** — Wraps the dispatchers with `transcribe_with_fallback` / `extract_*_with_fallback`. On primary-provider failure, retries once with Gemini if a Gemini key is configured.
+- **`src-tauri/src/prompts/`** — Shared extraction prompts (Gemini and any LLM provider call the same prompt builders).
+
+The upload pipeline in `src-tauri/src/commands/uploads.rs` calls `commands::fallback::*_with_fallback(...)` instead of `gemini::*` directly. Swapping providers means changing `providers.json`, no Rust changes needed.
+
+### Adding a new provider
+
+To add a new transcription or extraction backend:
+
+1. **Transcription**: implement a new variant in `src-tauri/src/transcription::Provider`. The `transcribe` method is the only required entry point.
+2. **Extraction**: any OpenAI-compatible endpoint already works via the `OpenaiCompatible` config path. For a non-OpenAI shape, add a new variant to `src-tauri/src/llm::client.rs` or extend `LlmClient`.
+3. **Frontend**: extend the `Select` options in `src/app/settings/page.tsx` (the backend already accepts any provider enum value).
+4. **Tests**: add a test in `src-tauri/src/transcription/` or `src-tauri/src/llm/client.rs` that exercises the new code path with a mock or fixture.
+
+### Fallback chain behavior
+
+When the primary provider fails (429, network error, auth failure), `commands::fallback::*` retries once with Gemini if a Gemini key is configured. Error messages mention both attempts:
+
+```
+Both providers failed. Primary: <reason>. Gemini: <reason>
+```
+
+If only the primary provider is configured (no Gemini key), the error mentions that:
+
+```
+Primary failed (<reason>) and no Gemini key configured for fallback
+```
 
 ### Data Storage (SQLite)
 
@@ -79,7 +113,7 @@ UI routes are standard Next.js App Router pages. Dynamic entity pages use query 
 - `/meetings/extract?id=...` — Extract notes view
 - `/projects` — Project management
 - `/projects/detail?id=...` — Project detail
-- `/settings` — Gemini API key configuration
+- `/settings` — Gemini + Groq + custom provider configuration
 
 ## Local Development
 
@@ -93,11 +127,17 @@ npm install
 npm run tauri:dev
 ```
 
-The app will open in a desktop window. On first run, go to **Settings** to enter your Gemini API key.
+The app will open in a desktop window. On first run, go to **Settings** to enter your Gemini and/or Groq API key. Groq's free tier (Whisper Large v3 + Llama 3.3 70B) is enough for personal use.
 
-### Gemini API Key
+### Provider Configuration
 
-Users save their personal Gemini API key via `/settings` page (stored in SQLite `user_gemini_keys` table). Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
+`/settings` exposes three cards:
+
+1. **Gemini API Key** — fallback provider (Gemini 3 Flash for both transcription + extraction). Free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. **Groq API Key** — free at [console.groq.com](https://console.groq.com/keys). Powers Whisper Large v3 transcription and Llama 3.3 70B extraction.
+3. **Custom Provider** — any OpenAI-compatible endpoint (OpenCode Go, DeepSeek, OpenRouter, custom). Enter base URL + API key + model name.
+
+API keys are stored in the OS credential store via `keyring` (separate slots: `local_user` for Gemini, `groq_local_user` for Groq). Provider settings (which backend to use, which model, custom provider URL) are persisted as JSON in `data_local_dir()/remembry/providers.json`.
 
 ### Build for Production
 
