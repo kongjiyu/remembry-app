@@ -533,6 +533,15 @@ server.tool(
 
 const UPLOAD_CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB — must match frontend
 
+// Guards against pathological inputs. 2 GB is well past any practical
+// lecture / meeting recording and 500 chunks means at most ~500 round trips.
+// Bump these if you have a real use case that needs more — but refuse first
+// and let the user confirm rather than silently OOMing.
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024;     // 2 GB
+const MAX_CHUNK_COUNT = 500;
+const CHUNK_RETRY_ATTEMPTS = 3;
+const CHUNK_RETRY_BASE_MS = 1000;  // exponential backoff: 1s, 2s, 4s
+
 server.tool(
   "remembry_upload_audio",
   "Upload an audio (or video/text) file to Remembry for transcription and knowledge extraction. Requires the Remembry desktop app to be running. Polls until processing completes and returns the new meeting ID. Use remembry_list_projects to find a project_id.",
@@ -559,8 +568,32 @@ server.tool(
     const stat = fs.statSync(audio_path);
     const fileSize = stat.size;
 
+    // ── Size / chunk-count guards ────────────────────────────────────────
+    // Refuse obviously broken inputs before opening a single HTTP connection.
+    // Catches the "user drags in a 10 GB file by mistake" case where the
+    // pipeline would otherwise allocate ~13 GB of base64 JSON.
+    if (fileSize > MAX_FILE_SIZE) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({
+          error: `File too large: ${fileSize} bytes (max ${MAX_FILE_SIZE})`,
+          hint: "Pre-process / compress the audio, or contact maintainers to raise the limit.",
+        }, null, 2) }],
+        isError: true,
+      };
+    }
+    const totalChunks = Math.ceil(fileSize / UPLOAD_CHUNK_SIZE);
+    if (totalChunks > MAX_CHUNK_COUNT) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({
+          error: `Too many chunks: ${totalChunks} (max ${MAX_CHUNK_COUNT})`,
+          hint: "Use a larger chunk size or a smaller file. Bump MAX_CHUNK_COUNT in mcp/src/index.ts if you have a real need.",
+        }, null, 2) }],
+        isError: true,
+      };
+    }
+
     const fileName = path.basename(audio_path);
-    const inferredMime = mime_type || inferMimeFromExtension(fileName);
+    const inferredMime = mime_type || inferMimeFromExtension(fileName, file_type);
 
     // ── Pre-flight: app reachable? ───────────────────────────────────────
     try {
@@ -577,7 +610,6 @@ server.tool(
     }
 
     // ── Phase 1: start_upload ────────────────────────────────────────────
-    const totalChunks = Math.ceil(fileSize / UPLOAD_CHUNK_SIZE);
     const startResp = await apiFetch("/api/upload/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -591,33 +623,70 @@ server.tool(
     }
     const uploadId = startResp.upload_id;
 
-    // ── Phase 2: append chunks (sequential, base64) ──────────────────────
-    const fileBuffer = fs.readFileSync(audio_path);
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * UPLOAD_CHUNK_SIZE;
-      const end = Math.min(start + UPLOAD_CHUNK_SIZE, fileSize);
-      const chunkBytes = fileBuffer.subarray(start, end);
-      const chunkB64 = chunkBytes.toString("base64");
+    // ── Phase 2: stream chunks (sequential, base64, retry-on-transient) ─
+    //
+    // Reads the file via streaming fs.createReadStream + async iterator
+    // instead of fs.readFileSync, so a 1 GB lecture never sits in memory
+    // twice (raw + base64). Each chunk is base64'd and POSTed immediately.
+    //
+    // Transient HTTP failures (ECONNRESET, 5xx, timeouts) retry up to
+    // CHUNK_RETRY_ATTEMPTS times with exponential backoff. The chunk
+    // protocol is idempotent on the server side (append_upload_chunk just
+    // appends bytes), so retrying the same chunk_index is safe.
+    await new Promise<void>((resolve, reject) => {
+      // Default encoding is null (binary Buffer chunks). Cast explicitly
+      // because Node's createReadStream types still permit string fallback.
+      const stream = fs.createReadStream(audio_path, { highWaterMark: UPLOAD_CHUNK_SIZE });
+      let chunkIndex = 0;
 
-      const chunkResp = await apiFetch("/api/upload/chunk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          upload_id: uploadId,
-          chunk_index: i,
-          chunk_data: chunkB64,
-        }),
+      stream.on("data", async (chunkBytes: string | Buffer) => {
+        const buffer = Buffer.isBuffer(chunkBytes) ? chunkBytes : Buffer.from(chunkBytes);
+        // Pause while we POST so backpressure prevents unbounded buffering.
+        stream.pause();
+        const myIndex = chunkIndex++;
+        const chunkB64 = chunkBytes.toString("base64");
+
+        let lastErr: unknown = null;
+        for (let attempt = 1; attempt <= CHUNK_RETRY_ATTEMPTS; attempt++) {
+          try {
+            const resp = await apiFetch("/api/upload/chunk", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                upload_id: uploadId,
+                chunk_index: myIndex,
+                chunk_data: chunkB64,
+              }),
+            });
+            if (resp.status === "ok") {
+              lastErr = null;
+              break;
+            }
+            lastErr = resp;
+          } catch (e) {
+            lastErr = e;
+          }
+          if (attempt < CHUNK_RETRY_ATTEMPTS) {
+            const backoff = CHUNK_RETRY_BASE_MS * Math.pow(2, attempt - 1);
+            await new Promise(r => setTimeout(r, backoff));
+          }
+        }
+
+        if (lastErr) {
+          stream.destroy();
+          reject(new Error(`Chunk ${myIndex + 1}/${totalChunks} failed after ${CHUNK_RETRY_ATTEMPTS} attempts: ${JSON.stringify(lastErr)}`));
+          return;
+        }
+
+        stream.resume();
       });
-      if (chunkResp.status !== "ok") {
-        return {
-          content: [{ type: "text", text: JSON.stringify({
-            error: `Chunk ${i + 1}/${totalChunks} failed`,
-            detail: chunkResp,
-          }, null, 2) }],
-          isError: true,
-        };
-      }
-    }
+
+      stream.on("end", () => resolve());
+      stream.on("error", (err) => reject(err));
+    }).catch(err => {
+      // Wrap as a tool-friendly error return
+      throw err;
+    });
 
     // ── Phase 3: enqueue processing ──────────────────────────────────────
     const procResp = await apiFetch("/api/upload/process", {
@@ -677,8 +746,11 @@ server.tool(
   }
 );
 
-// Minimal MIME inference — covers what we actually care about for upload.
-function inferMimeFromExtension(fileName: string): string {
+// MIME inference — uses the file extension when it looks familiar, and
+// falls back to a sensible default per `file_type` for everything else.
+// Returning `audio/mpeg` for an unknown `.txt` would be silently wrong —
+// we now pick the fallback based on the user-supplied file_type instead.
+function inferMimeFromExtension(fileName: string, fileType: "audio" | "video" | "text"): string {
   const ext = fileName.toLowerCase().split(".").pop() || "";
   const map: Record<string, string> = {
     mp3: "audio/mpeg",
@@ -694,7 +766,12 @@ function inferMimeFromExtension(fileName: string): string {
     md: "text/plain",
     mp4v: "video/mp4",
   };
-  return map[ext] || "audio/mpeg";
+  if (map[ext]) return map[ext];
+  // Fallback by file_type, not by guess. Caller already declared what they
+  // meant, so trust them.
+  if (fileType === "text") return "text/plain";
+  if (fileType === "video") return "video/mp4";
+  return "audio/mpeg";
 }
 
 // ── Tool: config_status ───────────────────────────────────────────────────

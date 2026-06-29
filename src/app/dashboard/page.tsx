@@ -6,15 +6,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/apiFetch";
 import { normalizeMeeting, buildProjectMap, type NormalizedMeeting } from "@/lib/meetingViews";
 import { UploadJobsBanner } from "@/components/ui/upload-jobs-banner";
 import { AppLink } from "@/components/ui/app-link";
 import { navigateTo } from "@/lib/navigation";
 import {
+    getDisplayName, setDisplayName,
+    hasPromptedForDisplayName, markDisplayNamePrompted,
+} from "@/lib/clientUser";
+import {
     Mic, CheckCircle2, Upload,
     FolderKanban, Plus,
-    Search, ArrowRight, Sparkles, Calendar, NotebookPen
+    Search, ArrowRight, Sparkles, Calendar, NotebookPen, Pencil
 } from "lucide-react";
 
 interface Project {
@@ -58,6 +63,52 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [dashboardQuestion, setDashboardQuestion] = useState("");
     const [selectedAskProjectId, setSelectedAskProjectId] = useState<string>("");
+
+    // Display name: read once on mount, re-read after edit so the greeting
+    // updates without a full page reload.
+    const [displayName, setDisplayNameState] = useState<string>("");
+    const [editingName, setEditingName] = useState(false);
+    const [nameDraft, setNameDraft] = useState("");
+
+    useEffect(() => {
+        setDisplayNameState(getDisplayName());
+    }, []);
+
+    // Time-of-day greeting — recomputed on the client so it stays correct
+    // even if the user keeps the tab open past midnight.
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        if (hour < 5) return "Working late";
+        if (hour < 12) return "Good Morning";
+        if (hour < 18) return "Good Afternoon";
+        return "Good Evening";
+    }, []);
+
+    const startEditName = () => {
+        setNameDraft(displayName);
+        setEditingName(true);
+    };
+
+    const commitEditName = () => {
+        setDisplayName(nameDraft);
+        setDisplayNameState(nameDraft.trim());
+        setEditingName(false);
+        markDisplayNamePrompted();
+    };
+
+    const cancelEditName = () => {
+        setEditingName(false);
+    };
+
+    // First-run UX: if the user has never set a name, prompt inline. Only
+    // runs once per device (tracked in localStorage separately from the name).
+    useEffect(() => {
+        if (!hasPromptedForDisplayName()) {
+            startEditName();
+            markDisplayNamePrompted();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -154,7 +205,11 @@ export default function DashboardPage() {
         .sort((a, b) => b.date - a.date)
         .slice(0, 5);
 
-    const recentProjectsList = projects.slice(0, 3);
+    // Cap at 2 so the row is always 2 project cards + 1 "New Project" card = 3
+    // total. Prevents the 4th item overflowing in the md:grid-cols-3 layout.
+    // Users with more projects discover them via the "View all" link in the
+    // Projects page (top nav).
+    const recentProjectsList = projects.slice(0, 2);
 
     const hasProjects = projects.length > 0;
     const askInputId = "dashboard-ask-input";
@@ -176,8 +231,50 @@ export default function DashboardPage() {
                             <Sparkles className="w-64 h-64 text-primary" />
                         </div>
                         <CardHeader>
-                            <CardTitle className="text-3xl font-light tracking-tight">
-                                Good Morning, <span className="font-semibold text-primary">Creator</span>
+                            <CardTitle className="text-3xl font-light tracking-tight flex flex-wrap items-baseline gap-x-3 gap-y-2">
+                                <span>{greeting},</span>
+                                {editingName ? (
+                                    <span className="flex items-center gap-2">
+                                        <Input
+                                            autoFocus
+                                            value={nameDraft}
+                                            onChange={e => setNameDraft(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === "Enter") commitEditName();
+                                                else if (e.key === "Escape") cancelEditName();
+                                            }}
+                                            placeholder="Your name"
+                                            maxLength={40}
+                                            className="h-10 w-56 text-2xl font-semibold border-primary/30 focus-visible:ring-primary/40"
+                                        />
+                                        <Button size="sm" variant="default" onClick={commitEditName}>
+                                            Save
+                                        </Button>
+                                        <Button size="sm" variant="ghost" onClick={cancelEditName}>
+                                            Cancel
+                                        </Button>
+                                    </span>
+                                ) : displayName ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="font-semibold text-primary">{displayName}</span>
+                                        <button
+                                            type="button"
+                                            onClick={startEditName}
+                                            aria-label="Edit name"
+                                            className="text-muted-foreground/60 hover:text-primary transition-colors p-1 rounded-md hover:bg-muted/50"
+                                        >
+                                            <Pencil className="size-3.5" />
+                                        </button>
+                                    </span>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={startEditName}
+                                        className="font-semibold text-primary hover:underline"
+                                    >
+                                        set your name
+                                    </button>
+                                )}
                             </CardTitle>
                             <CardDescription className="text-lg">
                                 You have <span className="font-medium text-foreground">{totalMeetings} events</span> processed and ready for search.
@@ -186,15 +283,19 @@ export default function DashboardPage() {
                         <CardContent className="relative z-10 space-y-4">
                             <div className="space-y-3">
                                 {hasProjects ? (
-                                    <select
-                                        value={selectedAskProjectId}
-                                        onChange={e => setSelectedAskProjectId(e.target.value)}
-                                        className="w-full max-w-xs h-9 px-3 rounded-lg border border-primary/20 bg-background/50 backdrop-blur-sm text-sm shadow-sm cursor-pointer"
-                                    >
-                                        {projects.map(p => (
-                                            <option key={p.id} value={p.id}>{p.display_name}</option>
-                                        ))}
-                                    </select>
+                                    // Styled Select matches the rest of the UI. Radix
+                                    // handles keyboard nav, theme-aware dropdown panel,
+                                    // and focus ring — raw <select> did none of that.
+                                    <Select value={selectedAskProjectId} onValueChange={setSelectedAskProjectId}>
+                                        <SelectTrigger className="w-full max-w-xs h-9 px-3 rounded-lg border-primary/20 bg-background/50 backdrop-blur-sm text-sm shadow-sm">
+                                            <SelectValue placeholder="Select project" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {projects.map(p => (
+                                                <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 ) : (
                                     <p className="text-sm text-muted-foreground">Create a project before asking Remembry.</p>
                                 )}
@@ -256,9 +357,12 @@ export default function DashboardPage() {
                     {/* RECENT PROJECTS ROW */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {loading ? (
-                             [1, 2, 3].map(i => (
-                                <div key={i} className="h-32 rounded-2xl bg-muted/20 animate-pulse" />
-                             ))
+                             // Match real layout: 2 project skeletons + 1 new-project skeleton
+                             <>
+                                 <div className="h-32 rounded-2xl bg-muted/20 animate-pulse" />
+                                 <div className="h-32 rounded-2xl bg-muted/20 animate-pulse" />
+                                 <div className="h-32 rounded-2xl bg-muted/20 animate-pulse" />
+                             </>
                         ) : recentProjectsList.length > 0 ? (
                             recentProjectsList.map((project) => (
                                 <AppLink key={project.id} href={`/projects/detail?id=${encodeURIComponent(project.id)}`}>
@@ -295,7 +399,7 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="text-center">
                                         <span className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors break-words">New Project</span>
-                                        <p className="text-[10px] text-muted-foreground/40 mt-0.5 uppercase tracking-widest font-bold">Add Store</p>
+                                        <p className="text-[10px] text-muted-foreground/40 mt-0.5 uppercase tracking-widest font-bold">Quick Add</p>
                                     </div>
                                 </CardContent>
                             </Card>

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AppLink } from "@/components/ui/app-link";
 import { usePathname } from "next/navigation";
+import { ActiveUploadBadge } from "@/components/ui/active-upload-badge";
 import {
     Sidebar,
     SidebarContent,
@@ -28,21 +29,27 @@ const navItems = [
         title: "Dashboard",
         url: "/dashboard",
         icon: LayoutDashboard,
+        showUploadBadge: false,
     },
     {
         title: "Projects",
         url: "/projects",
         icon: FolderKanban,
+        showUploadBadge: false,
     },
     {
         title: "Events",
         url: "/events",
         icon: Mic,
+        // Show a small badge next to "Events" while uploads are in flight,
+        // since the UploadJobsBanner is only visible on the dashboard.
+        showUploadBadge: true,
     },
     {
         title: "Notes",
         url: "/notes",
         icon: NotebookPen,
+        showUploadBadge: false,
     },
 ];
 
@@ -95,6 +102,7 @@ export function AppSidebar() {
                                         <AppLink href={item.url}>
                                             <item.icon className="size-4" />
                                             <span>{item.title}</span>
+                                            {item.showUploadBadge && <ActiveUploadBadge className="ml-auto" />}
                                         </AppLink>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
