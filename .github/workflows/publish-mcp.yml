@@ -6,8 +6,21 @@ on:
       - "mcp-v*"
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Run build + pack without publishing (true/false)"
+      version:
+        description: "Package version to publish (e.g. 0.3.3) — must match mcp/package.json"
+        required: true
+        type: string
+      npm_dist_tag:
+        description: "npm dist-tag (latest / next / beta)"
+        required: false
+        default: "latest"
+        type: choice
+        options:
+          - latest
+          - next
+          - beta
+      create_github_release:
+        description: "Also create a GitHub Release for this version?"
         required: false
         default: "true"
         type: choice
@@ -16,7 +29,8 @@ on:
           - "false"
 
 permissions:
-  contents: read
+  contents: write   # needed for softprops/action-gh-release
+  id-token: write   # needed for npm publish --provenance
 
 jobs:
   publish:
@@ -28,6 +42,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so changelog can compare to previous tag
+
+      - name: Resolve target version
+        id: version
+        run: |
+          # Two trigger paths:
+          #   - Tag push: github.ref_name is "mcp-v0.3.3" → version = "0.3.3"
+          #   - Manual dispatch: read from inputs.version
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#mcp-v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          # Strip leading 'v' just in case
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -48,48 +79,90 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Sanity-check package contents
-        # Verifies `files` globs in package.json resolve to actual artifacts
-        # before publishing. Catches missing `dist/` or typos in the include list.
+      - name: Verify version matches package.json
+        env:
+          TARGET_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          set -e
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "package.json version: $PKG_VERSION"
+          echo "requested version:     $TARGET_VERSION"
+          if [[ "$PKG_VERSION" != "$TARGET_VERSION" ]]; then
+            echo "::error::Version mismatch — refusing to publish."
+            echo "::error::Run 'cd mcp && npm version $TARGET_VERSION' locally, commit, and re-tag."
+            exit 1
+          fi
+
+      - name: Verify not already published
+        env:
+          TARGET_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Bail out if this exact version already exists on the registry.
+          # Catches re-running a failed publish, accidental re-tags, etc.
+          PKG_NAME=$(node -p "require('./package.json').name")
+          if npm view "$PKG_NAME@$TARGET_VERSION" version >/dev/null 2>&1; then
+            echo "::error::$PKG_NAME@$TARGET_VERSION is already published on npm."
+            echo "::error::Bump the version in mcp/package.json and re-run."
+            exit 1
+          fi
+          echo "Confirmed $PKG_NAME@$TARGET_VERSION is unpublished. Safe to publish."
+
+      - name: Sanity-check package contents
+        run: |
+          set -euo pipefail
           echo "=== Files that would be published ==="
           npm pack --dry-run 2>&1 | tee /tmp/pack-output.txt
-          # Fail the job if any expected file is missing from the tarball.
-          grep -q "dist/index.js" /tmp/pack-output.txt || {
-            echo "::error::dist/index.js missing from npm pack output"
-            exit 1
-          }
-          grep -q "README.md" /tmp/pack-output.txt || {
-            echo "::error::README.md missing from npm pack output"
-            exit 1
-          }
-
-      - name: Determine publish mode
-        id: mode
-        run: |
-          # Tag push always publishes (the whole point of a tag).
-          # Manual dispatch respects the dry_run input.
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "publish=${{ github.event.inputs.dry_run == 'false' && 'true' || 'false' }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "::notice::publish mode = $(cat "$GITHUB_OUTPUT" | cut -d= -f2)"
+          for required in "dist/index.js" "README.md"; do
+            if ! grep -q "$required" /tmp/pack-output.txt; then
+              echo "::error::$required missing from npm pack output"
+              exit 1
+            fi
+          done
 
       - name: Publish to npm
-        if: steps.mode.outputs.publish == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
-        run: npm publish --access public --provenance
+        run: |
+          set -euo pipefail
+          DIST_TAG="${{ github.event.inputs.npm_dist_tag || 'latest' }}"
+          # --provenance requires id-token: write (declared at job top) and
+          # links the published artifact to this GitHub Actions run via
+          # Sigstore — verifiable at https://www.npmjs.com/package/...
+          npm publish --access public --provenance --tag "$DIST_TAG"
+
+      - name: Create GitHub Release
+        # Only on tag pushes. Manual dispatch doesn't create a release —
+        # the user is presumably iterating locally and can tag once happy.
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Auto-generate release notes from commits since the previous mcp-v* tag.
+          PREV_TAG=$(git tag --sort=-creatordate | grep -E '^mcp-v' | grep -v "mcp-v${VERSION}$" | head -1 || true)
+          if [[ -n "$PREV_TAG" ]]; then
+            RANGE="${PREV_TAG}..mcp-v${VERSION}"
+            echo "Generating notes from $RANGE"
+          else
+            RANGE="mcp-v${VERSION}"
+            echo "No previous mcp-v tag — using single-tag range"
+          fi
+          gh release create "mcp-v${VERSION}" \
+            --title "@cstan0824/remembry-mcp v${VERSION}" \
+            --generate-notes \
+            --target "${{ github.sha }}"
 
       - name: Publish summary
         if: always()
         run: |
-          echo "### Publish-MCP summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Trigger: \`${{ github.event_name }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Ref: \`${{ github.ref }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Published: \`${{ steps.mode.outputs.publish }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Package version: \`$(node -p "require('./package.json').version")\`" >> "$GITHUB_STEP_SUMMARY"
+          VERSION=$(node -p "require('./package.json').version")
+          {
+            echo "### Publish MCP Server — v${VERSION}"
+            echo ""
+            echo "- Trigger: \`${{ github.event_name }}\`"
+            echo "- Ref: \`${{ github.ref }}\`"
+            echo "- Version: \`${VERSION}\`"
+            echo "- Outcome: \`${{ job.status }}\`"
+            echo "- Package: [@cstan0824/remembry-mcp](https://www.npmjs.com/package/@cstan0824/remembry-mcp)"
+          } >> "$GITHUB_STEP_SUMMARY"
