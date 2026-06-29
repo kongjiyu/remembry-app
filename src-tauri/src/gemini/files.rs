@@ -1,6 +1,6 @@
 //! Gemini Files API — resumable upload and polling.
 
-use crate::gemini::{GeminiClient, GEMINI_BASE_URL, GEMINI_API_VERSION, retry_with_backoff, is_retryable_error, normalize_file_resource_name, sanitize_api_key_from_error, format_gemini_error};
+use crate::gemini::{GeminiClient, GEMINI_BASE_URL, GEMINI_API_VERSION, retry_with_backoff, is_retryable_error, normalize_file_resource_name, format_reqwest_error, format_gemini_error};
 use serde::Deserialize;
 use std::path::Path;
 
@@ -72,8 +72,9 @@ async fn initiate_upload(
         .send()
         .await
         .map_err(|e| {
-            let msg = format!("upload init request failed: {}", e);
-            sanitize_api_key_from_error(&msg)
+            let msg = format_reqwest_error("upload init request failed", &e);
+            log::error!("[Gemini] upload init transport error: {}", msg);
+            msg
         })?;
 
     let status = response.status();
@@ -116,8 +117,9 @@ async fn upload_and_finalize(
         .send()
         .await
         .map_err(|e| {
-            let msg = format!("upload request failed: {}", e);
-            sanitize_api_key_from_error(&msg)
+            let msg = format_reqwest_error("upload request failed", &e);
+            log::error!("[Gemini] upload transport error: {}", msg);
+            msg
         })?;
 
     if !response.status().is_success() && !is_retryable_error(response.status()) {
@@ -182,8 +184,9 @@ pub async fn poll_file_status(client: &GeminiClient, name: &str) -> Result<FileI
                 .send()
                 .await
                 .map_err(|e| {
-                    let msg = format!("poll request failed: {}", e);
-                    sanitize_api_key_from_error(&msg)
+                    let msg = format_reqwest_error("poll request failed", &e);
+                    log::error!("[Gemini] poll transport error: {}", msg);
+                    msg
                 })
         }).await
         .map_err(|e| format!("poll failed after retries: {:?}", e))?;
@@ -228,8 +231,9 @@ pub async fn delete_file(client: &GeminiClient, name: &str) -> Result<(), String
         .send()
         .await
         .map_err(|e| {
-            let msg = format!("delete request failed: {}", e);
-            sanitize_api_key_from_error(&msg)
+            let msg = format_reqwest_error("delete request failed", &e);
+            log::error!("[Gemini] delete transport error: {}", msg);
+            msg
         })?;
 
     let status = response.status();
@@ -248,6 +252,7 @@ pub async fn delete_file(client: &GeminiClient, name: &str) -> Result<(), String
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gemini::sanitize_api_key_from_error;
 
     // ── normalize_file_resource_name tests ─────────────────────────────────
 

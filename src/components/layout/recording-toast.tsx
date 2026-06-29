@@ -57,41 +57,49 @@ export function RecordingToast() {
 
     const isActive = rec.status === "recording" || rec.status === "paused";
 
+    // Toast lifecycle effect — separate from the clock tick so per-second
+    // nowMs updates don't churn the toast and so we reliably dismiss on
+    // any transition out of active recording (idle).
     React.useEffect(() => {
-        if (isActive && rec.title) {
-            sonnerToast.custom(
-                (toastId) => (
-                    <RecordingCard
-                        title={rec.title}
-                        elapsed={rec.startedAt ? formatElapsed(elapsedMs) : "00:00"}
-                        isPaused={isPaused}
-                        onStop={async () => {
-                            try {
-                                await rec.stop();
-                                sonnerToast.dismiss(toastId);
-                                sonnerToast.success("Recording stopped");
-                            } catch {
-                                sonnerToast.error("Failed to stop recording");
-                            }
-                        }}
-                        onPause={() => rec.pause()}
-                        onResume={() => rec.resume()}
-                        onDismiss={() => sonnerToast.dismiss(toastId)}
-                    />
-                ),
-                {
-                    id: "recording-active",
-                    duration: Infinity,
-                    position: "top-center",
-                }
-            );
-        } else {
+        if (!isActive || !rec.title) {
             sonnerToast.dismiss("recording-active");
+            return;
         }
-        // elapsedMs is intentionally excluded — changes to it trigger the interval above
-        // which re-renders and re-invokes this effect via nowMs dependencies.
+        sonnerToast.custom(
+            (toastId) => (
+                <RecordingCard
+                    title={rec.title}
+                    elapsed={rec.startedAt ? formatElapsed(elapsedMs) : "00:00"}
+                    isPaused={isPaused}
+                    onStop={async () => {
+                        try {
+                            await rec.stop();
+                            sonnerToast.dismiss(toastId);
+                            sonnerToast.success("Recording stopped");
+                        } catch {
+                            sonnerToast.error("Failed to stop recording");
+                        }
+                    }}
+                    onPause={() => rec.pause()}
+                    onResume={() => rec.resume()}
+                    onDismiss={() => sonnerToast.dismiss(toastId)}
+                />
+            ),
+            {
+                id: "recording-active",
+                duration: Infinity,
+                position: "top-center",
+            }
+        );
+        // Cleanup on unmount or when deps flip back to inactive — guarantees
+        // the toast disappears when the user stops recording.
+        return () => {
+            sonnerToast.dismiss("recording-active");
+        };
+        // elapsedMs is intentionally excluded — it ticks via nowMs in the
+        // separate clock effect below, not by re-creating the toast.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isActive, isPaused, rec.title, rec.startedAt, nowMs, rec.stop, rec.pause, rec.resume]);
+    }, [isActive, isPaused, rec.title, rec.startedAt, rec.stop, rec.pause, rec.resume]);
 
     return null;
 }

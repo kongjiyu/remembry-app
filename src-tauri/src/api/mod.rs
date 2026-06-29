@@ -1,4 +1,5 @@
 pub mod routes;
+pub mod upload;
 
 use axum::{Router, routing::{get, post}};
 use std::sync::Arc;
@@ -29,6 +30,12 @@ pub fn create_router(state: Arc<ApiState>) -> Router {
         .route("/api/record/start", post(routes::start_recording))
         .route("/api/record/stop", get(routes::stop_recording))
         .route("/api/record/status", get(routes::recording_status))
+        // Chunked file upload routes — drive the existing Tauri upload pipeline
+        // from external clients (MCP, future HTTP-based integrations).
+        .route("/api/upload/start", post(upload::upload_start))
+        .route("/api/upload/chunk", post(upload::upload_chunk))
+        .route("/api/upload/process", post(upload::upload_process))
+        .route("/api/upload/job", get(upload::upload_job_status))
         .with_state(state)
         .layer(tower_http::cors::CorsLayer::permissive())
 }

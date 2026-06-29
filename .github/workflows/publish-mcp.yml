@@ -1,0 +1,95 @@
+name: Publish MCP Server
+
+on:
+  push:
+    tags:
+      - "mcp-v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run build + pack without publishing (true/false)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build & publish @cstan0824/remembry-mcp
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+          cache-dependency-path: mcp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (no emit)
+        # Catches TypeScript errors that `tsc` (used by `build`) would otherwise
+        # silently emit into dist/ via type assertions.
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Sanity-check package contents
+        # Verifies `files` globs in package.json resolve to actual artifacts
+        # before publishing. Catches missing `dist/` or typos in the include list.
+        run: |
+          set -e
+          echo "=== Files that would be published ==="
+          npm pack --dry-run 2>&1 | tee /tmp/pack-output.txt
+          # Fail the job if any expected file is missing from the tarball.
+          grep -q "dist/index.js" /tmp/pack-output.txt || {
+            echo "::error::dist/index.js missing from npm pack output"
+            exit 1
+          }
+          grep -q "README.md" /tmp/pack-output.txt || {
+            echo "::error::README.md missing from npm pack output"
+            exit 1
+          }
+
+      - name: Determine publish mode
+        id: mode
+        run: |
+          # Tag push always publishes (the whole point of a tag).
+          # Manual dispatch respects the dry_run input.
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "publish=${{ github.event.inputs.dry_run == 'false' && 'true' || 'false' }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "::notice::publish mode = $(cat "$GITHUB_OUTPUT" | cut -d= -f2)"
+
+      - name: Publish to npm
+        if: steps.mode.outputs.publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+        run: npm publish --access public --provenance
+
+      - name: Publish summary
+        if: always()
+        run: |
+          echo "### Publish-MCP summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Trigger: \`${{ github.event_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ref: \`${{ github.ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Published: \`${{ steps.mode.outputs.publish }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Package version: \`$(node -p "require('./package.json').version")\`" >> "$GITHUB_STEP_SUMMARY"

@@ -70,7 +70,16 @@
       "Bash(taskkill /F /IM remembry.exe)",
       "Bash(git add *)",
       "Bash(git commit -m 'feat: add HTTP API for MCP recording integration *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git stash *)",
+      "Bash(git restore *)",
+      "Bash(cargo test *)",
+      "Bash(/tmp/task-brief docs/superpowers/plans/2026-06-22-remembry-improvements.md 5 .superpowers/sdd/task-5-brief.md)",
+      "Bash(cargo build *)",
+      "Bash(npx eslint *)",
+      "Bash(/tmp/review-package a7cbf32 *)",
+      "Read(//c/cstan/projects/remembry-app/**)",
+      "Bash(xargs grep -l \"start_recording_session\\\\|stop_recording_session\\\\|get_recording_state\\\\|save_audio_blob\")"
     ]
   },
   "enableAllProjectMcpServers": true

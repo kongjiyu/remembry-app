@@ -522,6 +522,181 @@ server.tool(
   }
 );
 
+// ── Tool: upload_audio ───────────────────────────────────────────────────
+//
+// Streams a local audio file to the running Remembry desktop app's HTTP API
+// (port 17890). The app drives the existing upload pipeline (Gemini/Groq
+// transcription → LLM extraction → SQLite persist) — this tool is just a
+// chunked-upload transport.
+//
+// Matches the WebView's protocol exactly: 5 MB chunks, base64-encoded.
+
+const UPLOAD_CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB — must match frontend
+
+server.tool(
+  "remembry_upload_audio",
+  "Upload an audio (or video/text) file to Remembry for transcription and knowledge extraction. Requires the Remembry desktop app to be running. Polls until processing completes and returns the new meeting ID. Use remembry_list_projects to find a project_id.",
+  {
+    audio_path: z.string().describe("Absolute path to the audio file (e.g. /c/Users/.../lecture.mp3)"),
+    project_id: z.string().describe("Project ID (e.g. 'project_xxx') to attach the meeting to"),
+    title: z.string().describe("Meeting/event title"),
+    context: z.string().optional().default("").describe("Optional context/description for the meeting"),
+    file_type: z.enum(["audio", "video", "text"]).optional().default("audio").describe("File type (default: audio)"),
+    mime_type: z.string().optional().describe("MIME type override (default: inferred from file extension)"),
+    event_type: z.enum(["meeting", "interview", "standup", "lecture"]).optional().default("meeting").describe("Event type (default: meeting)"),
+    event_tags: z.array(z.string()).optional().default([]).describe("Tags for the event"),
+    poll_interval_ms: z.number().optional().default(2000).describe("Job status poll interval in milliseconds (default: 2000)"),
+    max_wait_ms: z.number().optional().default(600000).describe("Maximum wait time in ms before giving up (default: 10 minutes)"),
+  },
+  async ({ audio_path, project_id, title, context, file_type, mime_type, event_type, event_tags, poll_interval_ms, max_wait_ms }) => {
+    // ── Validate file ────────────────────────────────────────────────────
+    if (!fs.existsSync(audio_path)) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ error: `File not found: ${audio_path}` }, null, 2) }],
+        isError: true,
+      };
+    }
+    const stat = fs.statSync(audio_path);
+    const fileSize = stat.size;
+
+    const fileName = path.basename(audio_path);
+    const inferredMime = mime_type || inferMimeFromExtension(fileName);
+
+    // ── Pre-flight: app reachable? ───────────────────────────────────────
+    try {
+      await apiFetch("/api/health");
+    } catch (e: any) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({
+          error: "Remembry desktop app is not running on http://127.0.0.1:17890",
+          hint: "Open the Remembry app first, then retry.",
+          detail: e.message,
+        }, null, 2) }],
+        isError: true,
+      };
+    }
+
+    // ── Phase 1: start_upload ────────────────────────────────────────────
+    const totalChunks = Math.ceil(fileSize / UPLOAD_CHUNK_SIZE);
+    const startResp = await apiFetch("/api/upload/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_name: fileName, total_chunks: totalChunks }),
+    });
+    if (startResp.status !== "ok") {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ error: "start_upload failed", detail: startResp }, null, 2) }],
+        isError: true,
+      };
+    }
+    const uploadId = startResp.upload_id;
+
+    // ── Phase 2: append chunks (sequential, base64) ──────────────────────
+    const fileBuffer = fs.readFileSync(audio_path);
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * UPLOAD_CHUNK_SIZE;
+      const end = Math.min(start + UPLOAD_CHUNK_SIZE, fileSize);
+      const chunkBytes = fileBuffer.subarray(start, end);
+      const chunkB64 = chunkBytes.toString("base64");
+
+      const chunkResp = await apiFetch("/api/upload/chunk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          upload_id: uploadId,
+          chunk_index: i,
+          chunk_data: chunkB64,
+        }),
+      });
+      if (chunkResp.status !== "ok") {
+        return {
+          content: [{ type: "text", text: JSON.stringify({
+            error: `Chunk ${i + 1}/${totalChunks} failed`,
+            detail: chunkResp,
+          }, null, 2) }],
+          isError: true,
+        };
+      }
+    }
+
+    // ── Phase 3: enqueue processing ──────────────────────────────────────
+    const procResp = await apiFetch("/api/upload/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        upload_id: uploadId,
+        project_id,
+        title,
+        context: context || "",
+        file_type,
+        mime_type: inferredMime,
+        event_type,
+        event_tags,
+        notes_languages: ["en"],
+      }),
+    });
+    if (procResp.status !== "ok") {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ error: "process failed", detail: procResp }, null, 2) }],
+        isError: true,
+      };
+    }
+    const jobId = procResp.job_id;
+
+    // ── Phase 4: poll job status until terminal ──────────────────────────
+    const deadline = Date.now() + max_wait_ms;
+    let lastStatus: any = null;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, poll_interval_ms));
+      const statusResp = await apiFetch(`/api/upload/job?job_id=${encodeURIComponent(jobId)}`);
+      if (statusResp.status === "ok" && statusResp.job) {
+        lastStatus = statusResp.job;
+        if (["completed", "failed", "cancelled", "cleanup_pending"].includes(lastStatus.status)) {
+          break;
+        }
+      }
+    }
+
+    const isTerminal = lastStatus && ["completed", "failed", "cancelled", "cleanup_pending"].includes(lastStatus.status);
+    return {
+      content: [{ type: "text", text: JSON.stringify({
+        job_id: jobId,
+        meeting_id: lastStatus?.meeting_id || null,
+        upload_id: uploadId,
+        final_status: lastStatus?.status || (isTerminal ? "unknown" : "timeout"),
+        progress: lastStatus?.progress,
+        message: lastStatus?.message,
+        error: lastStatus?.error,
+        file_size: fileSize,
+        total_chunks: totalChunks,
+        title,
+        timed_out: !isTerminal,
+      }, null, 2) }],
+      isError: lastStatus?.status === "failed",
+    };
+  }
+);
+
+// Minimal MIME inference — covers what we actually care about for upload.
+function inferMimeFromExtension(fileName: string): string {
+  const ext = fileName.toLowerCase().split(".").pop() || "";
+  const map: Record<string, string> = {
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    flac: "audio/flac",
+    webm: "audio/webm",
+    mp4: "audio/mp4",
+    mpeg: "audio/mpeg",
+    aac: "audio/aac",
+    txt: "text/plain",
+    md: "text/plain",
+    mp4v: "video/mp4",
+  };
+  return map[ext] || "audio/mpeg";
+}
+
 // ── Tool: config_status ───────────────────────────────────────────────────
 
 server.tool(

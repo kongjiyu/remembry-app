@@ -568,10 +568,26 @@ export default function NewEventPage() {
                                             <Download className="size-4" />
                                         </Button>
                                     ) : uploadedFile.url ? (
-                                        <Button variant="ghost" size="icon" asChild className="text-muted-foreground hover:text-primary">
-                                            <a href={uploadedFile.url} download={uploadedFile.name}>
-                                                <Download className="size-4" />
-                                            </a>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => {
+                                                try {
+                                                    const link = document.createElement("a");
+                                                    link.href = uploadedFile.url!;
+                                                    link.download = uploadedFile.name;
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    document.body.removeChild(link);
+                                                    toast.success(`Saved "${uploadedFile.name}"`);
+                                                } catch (err) {
+                                                    toast.error(err instanceof Error ? err.message : "Could not save audio");
+                                                }
+                                            }}
+                                            aria-label="Download recording"
+                                            className="text-muted-foreground hover:text-primary"
+                                        >
+                                            <Download className="size-4" />
                                         </Button>
                                     ) : null}
                                     <Button

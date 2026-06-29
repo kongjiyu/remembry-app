@@ -58,3 +58,10 @@ screenshots/
 *.mp3
 *.wav
 *.mp4
+
+# agent-local runtime artifacts (Codex, Claude, Superpowers)
+.codex/
+.superpowers/
+# dev-mode log files (regenerated on every `npm run tauri:dev`)
+_devmode.log
+_devmode-*.log

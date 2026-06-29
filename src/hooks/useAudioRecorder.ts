@@ -113,10 +113,6 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
             // effect bodies) doesn't fire — the actual reset still
             // happens before the next paint via the deferred callback.
             queueMicrotask(() => setAnalyser(null));
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach((track) => track.stop());
                 streamRef.current = null;
@@ -152,13 +148,6 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
                 audioContextRef.current = audioContext;
                 sourceRef.current = source;
                 setAnalyser(analyserNode);
-                if (provider.startedAt && providerRecording) {
-                    const startMs = provider.startedAt;
-                    setDuration(Math.floor((Date.now() - startMs) / 1000));
-                    timerRef.current = setInterval(() => {
-                        setDuration(Math.floor((Date.now() - startMs) / 1000));
-                    }, 1000);
-                }
             } catch (err) {
                 // Visualizer is best-effort; ignore if mic is busy
                 console.warn("[useAudioRecorder] visualizer attach failed", err);
@@ -169,22 +158,34 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         };
     }, [providerActive, providerRecording, provider.startedAt]);
 
-    // Pause the duration timer when the provider is paused; restart on resume.
+    // Single source of truth for the duration timer. Always clear the
+    // previous timer before deciding what to do — eliminates the race
+    // between the (now-removed) pause-only effect and the visualizer
+    // effect's async getUserMedia callback that could recreate the timer
+    // after pause cleared it.
+    //
+    // - Active + recording → tick once per second, anchored to provider.startedAt
+    // - Active + paused     → set the frozen duration once, no interval
+    // - Idle                → clear timer, leave whatever duration the
+    //                         lastCompleted/resetRecording set
     useEffect(() => {
-        if (provider.status === "paused") {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
-        } else if (provider.status === "recording" && provider.startedAt) {
-            if (timerRef.current) return; // already running
-            const startMs = provider.startedAt;
-            setDuration(Math.floor((Date.now() - startMs) / 1000));
-            timerRef.current = setInterval(() => {
-                setDuration(Math.floor((Date.now() - startMs) / 1000));
-            }, 1000);
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
         }
-    }, [provider.status, provider.startedAt]);
+        if (!providerActive || !provider.startedAt) {
+            return;
+        }
+        const startMs = provider.startedAt;
+        const update = () => setDuration(Math.floor((Date.now() - startMs) / 1000));
+        if (providerRecording) {
+            update();
+            timerRef.current = setInterval(update, 1000);
+        } else {
+            // Paused — display the value at the moment of pause, do not tick.
+            update();
+        }
+    }, [providerActive, providerRecording, provider.startedAt]);
 
     // Keep audioUrlRef in sync so the unmount cleanup can revoke the latest URL
     useEffect(() => {
@@ -252,6 +253,15 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
+        }
+        // Clear the local duration immediately so any UI bound to it
+        // (preview card / re-record flow) doesn't briefly show the
+        // pre-stop value while the provider's async stop resolves.
+        // The provider's lastCompleted handler will repopulate it
+        // with the actual final duration once the blob is flushed.
+        const startMs = provider.startedAt;
+        if (startMs) {
+            setDuration(Math.floor((Date.now() - startMs) / 1000));
         }
         void provider.stop().catch((err) => {
             console.error("[useAudioRecorder] provider.stop failed", err);
