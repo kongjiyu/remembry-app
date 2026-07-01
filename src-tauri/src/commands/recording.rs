@@ -5,17 +5,28 @@ use tauri::{AppHandle, Manager};
 use crate::api::RecordingSession;
 use crate::api::ApiState;
 
-#[tauri::command]
-pub async fn start_recording_session(
-    app: AppHandle,
+/// Register a fresh recording session in `ApiState`. Shared by the
+/// `start_recording_session` Tauri command and the HTTP
+/// `POST /api/record/start` route so the session is registered in a
+/// single canonical place — no matter who triggered the start, the
+/// session is the same.
+///
+/// Returns `Err("A recording is already in progress")` if a session
+/// is already registered, so the HTTP handler can return the same
+/// shape of error the Tauri command does.
+pub async fn register_recording_session(
+    state: &ApiState,
     title: String,
 ) -> Result<RecordingSessionDto, String> {
-    let state = app.state::<std::sync::Arc<ApiState>>().inner().clone();
     let mut guard = state.recording.lock().await;
     if guard.is_some() {
         return Err("A recording is already in progress".to_string());
     }
-    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_data = state
+        .app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     let temp_dir = app_data.join("temp_uploads");
     std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
     let job_id = format!("rec_{}", chrono::Utc::now().timestamp_millis());
@@ -33,6 +44,15 @@ pub async fn start_recording_session(
         started_at_ms: chrono::Utc::now().timestamp_millis(),
         audio_path: audio_path.to_string_lossy().to_string(),
     })
+}
+
+#[tauri::command]
+pub async fn start_recording_session(
+    app: AppHandle,
+    title: String,
+) -> Result<RecordingSessionDto, String> {
+    let state = app.state::<std::sync::Arc<ApiState>>().inner().clone();
+    register_recording_session(&state, title).await
 }
 
 #[tauri::command]

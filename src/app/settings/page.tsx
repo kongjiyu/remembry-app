@@ -76,7 +76,7 @@ interface ProviderConfig {
     transcription: "groq" | "gemini";
     extraction: "groq" | "openai_compatible" | "gemini";
     groq_transcription_model: "whisper_large_v3" | "whisper_large_v3_turbo";
-    groq_extraction_model: "llama_33_70b" | "llama_4_scout" | "qwen_3_32b" | "gpt_oss_120b";
+    groq_extraction_model: "llama33_70b" | "llama4_scout" | "qwen3_32b" | "gpt_oss120b";
     custom_base_url: string | null;
     custom_model: string | null;
     groq_api_key?: string | null;
@@ -314,7 +314,7 @@ export default function SettingsPage() {
 
     return (
         <DashboardLayout breadcrumbs={[{ label: "Settings" }]} title="Settings">
-            <div className="max-w-3xl space-y-6">
+            <div className="mx-auto max-w-3xl space-y-6">
                 {/* App Updates */}
                 <Card className="border-none shadow-sm bg-card/50 backdrop-blur-xl">
                     <CardHeader>
@@ -554,10 +554,10 @@ export default function SettingsPage() {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="llama_33_70b">Llama 3.3 70B (Best)</SelectItem>
-                                                <SelectItem value="llama_4_scout">Llama 4 Scout</SelectItem>
-                                                <SelectItem value="qwen_3_32b">Qwen 3 32B</SelectItem>
-                                                <SelectItem value="gpt_oss_120b">GPT OSS 120B</SelectItem>
+                                                <SelectItem value="llama33_70b">Llama 3.3 70B (Best)</SelectItem>
+                                                <SelectItem value="llama4_scout">Llama 4 Scout</SelectItem>
+                                                <SelectItem value="qwen3_32b">Qwen 3 32B</SelectItem>
+                                                <SelectItem value="gpt_oss120b">GPT OSS 120B</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>

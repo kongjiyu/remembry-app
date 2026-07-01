@@ -7,7 +7,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server that connect
 
 ## Features
 
-- **24 MCP tools** — full CRUD for projects, events, knowledge, documents, transcriptions, app launcher, and recording control
+- **25 MCP tools** — full CRUD for projects, events, knowledge, documents, transcriptions, app launcher, recording control, and end-to-end record-and-upload
 - **Recording requires app** — audio recording triggers the Remembry desktop app (auto-opens if not running)
 - **Full-text search** — search across meeting titles, transcriptions, and AI-extracted knowledge
 - **Knowledge aggregation** — pull action items, decisions, and questions across all events
@@ -391,6 +391,40 @@ Check if the Remembry app is running and recording status.
 
 **Returns:** `status`, `message`
 
+---
+
+#### `remembry_upload_recording`
+
+Upload the most recently completed recording to Remembry for transcription and knowledge extraction. Run `remembry_start_recording`, then `remembry_stop_recording`, then this tool. The audio is streamed through the same chunked-upload pipeline as `remembry_upload_audio`, just sourced from the app's `temp_uploads` directory instead of a path you supply. Polls until processing completes and returns the new meeting ID.
+
+| Input | Type | Required | Description |
+|-------|------|----------|-------------|
+| `project_id` | string | yes | Project ID (e.g. `project_xxx`) to attach the meeting to |
+| `title` | string | no | Override the meeting title (default: title from the recording) |
+| `context` | string | no | Optional context/description for the meeting |
+| `file_type` | enum | no | `audio`, `video`, or `text` (default: `audio`) |
+| `mime_type` | string | no | MIME type override (default: inferred from file extension) |
+| `event_type` | enum | no | `meeting`, `interview`, `standup`, or `lecture` (default: `meeting`) |
+| `event_tags` | string[] | no | Tags for the event |
+| `poll_interval_ms` | number | no | Job status poll interval in ms (default: 2000) |
+| `max_wait_ms` | number | no | Maximum wait time in ms before giving up (default: 600000 = 10 min) |
+| `consume` | boolean | no | If `true`, clear the last-completed-recording slot after a successful upload so the next call doesn't pick up the same file (default: `true`) |
+
+**Returns:** `job_id`, `meeting_id`, `upload_id`, `final_status`, `progress`, `message`, `error`, `file_size`, `total_chunks`, `title`, `source: "recording"`, `source_hint`, `timed_out`
+
+**End-to-end record-and-upload flow:**
+
+```
+1. remembry_start_recording (title="Sprint Planning")
+2. ... user records audio in the Remembry app ...
+3. remembry_stop_recording            → returns audio_path, job_id
+4. remembry_upload_recording          → streams the file through
+   (with project_id)                    the upload pipeline
+                                        (transcribe → extract → save)
+```
+
+Internally the desktop app exposes `/api/record/last` so the MCP can pick up the file path the WebView just flushed to disk. On a successful upload, the MCP calls `/api/record/last/clear` so the next call to `remembry_upload_recording` doesn't re-pick-up the same file.
+
 ### Write Tools
 
 #### `remembry_create_project`
@@ -557,6 +591,8 @@ Delete a document by ID.
 | `remembry_start_recording` | ❌ | ❌ | ❌ |
 | `remembry_stop_recording` | ❌ | ❌ | ❌ |
 | `remembry_recording_status` | ✅ | ✅ | ❌ |
+| `remembry_upload_audio` | ❌ | ❌ | ❌ |
+| `remembry_upload_recording` | ❌ | ❌ | ❌ |
 | `remembry_create_project` | ❌ | ❌ | ❌ |
 | `remembry_update_project` | ❌ | ✅ | ❌ |
 | `remembry_delete_project` | ❌ | ✅ | ✅ |
@@ -591,7 +627,8 @@ Once connected, ask your AI assistant naturally:
 
 **Recording (via desktop app):**
 - "Record a meeting called Sprint Planning" → opens app, starts recording
-- "Stop recording" → stops and transcribes
+- "Stop recording" → stops and surfaces the file path
+- "Upload that recording to my Engineering project" → streams through the upload pipeline
 - "What new meetings do I have?" → lists recent meetings
 
 ## Development

@@ -272,10 +272,12 @@ function ProjectDetailContent() {
         meeting.display_name.toLowerCase().includes(searchQuery.toLowerCase())
     ) || [];
 
-    const filteredNotes = notes.filter(n =>
-        n.display_name.toLowerCase().includes(notesSearchQuery.toLowerCase()) ||
-        n.content.toLowerCase().includes(notesSearchQuery.toLowerCase())
-    );
+    const filteredNotes = notes
+        .filter(n => !n.id.startsWith('meeting-transcript/'))
+        .filter(n =>
+            n.display_name.toLowerCase().includes(notesSearchQuery.toLowerCase()) ||
+            n.content.toLowerCase().includes(notesSearchQuery.toLowerCase())
+        );
 
     const handleDeleteProject = async () => {
         if (!project) return;

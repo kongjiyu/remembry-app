@@ -79,8 +79,19 @@
       "Bash(npx eslint *)",
       "Bash(/tmp/review-package a7cbf32 *)",
       "Read(//c/cstan/projects/remembry-app/**)",
-      "Bash(xargs grep -l \"start_recording_session\\\\|stop_recording_session\\\\|get_recording_state\\\\|save_audio_blob\")"
+      "Bash(xargs grep -l \"start_recording_session\\\\|stop_recording_session\\\\|get_recording_state\\\\|save_audio_blob\")",
+      "Bash(xargs grep -l \"events/new\")",
+      "mcp__context7__resolve-library-id",
+      "WebFetch(domain:docs.rs)",
+      "Bash(npx tsc *)",
+      "Bash(xargs grep -l \"mcp\\\\|MCP\")"
     ]
   },
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "disabledMcpjsonServers": [
+    "remembry"
+  ],
+  "enabledPlugins": {
+    "frontend-slides@frontend-slides": false
+  }
 }

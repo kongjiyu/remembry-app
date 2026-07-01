@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { Mic, Square, X, Pause, Play } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useRecording } from "@/components/layout/recording-provider";
 import { toast as sonnerToast } from "sonner";
 import { cn } from "@/lib/utils";
+import { navigateTo } from "@/lib/navigation";
 
 function formatElapsed(ms: number): string {
     const totalSec = Math.floor(ms / 1000);
@@ -14,28 +15,43 @@ function formatElapsed(ms: number): string {
     return `${m}:${s}`;
 }
 
+const TOAST_ID = "recording-active";
+
 export function RecordingToast() {
     const rec = useRecording();
+    const pathname = usePathname();
     const [nowMs, setNowMs] = React.useState(0);
     const isPaused = rec.status === "paused";
+
+    // The toast is a global control surface for the recording — but when
+    // the user is already on the create event page the live recording UI
+    // is right there, so the toast would be redundant clutter. Hide it on
+    // /events/new so the user isn't fighting two views of the same state.
+    const isOnCreateEventPage = pathname?.startsWith("/events/new") ?? false;
 
     // Safety-net polling: every 2s, ask the provider to re-sync from the
     // Rust backend. Catches state drift after navigation, page refresh,
     // or any path where the provider state fell out of sync (e.g. an
     // external HTTP /api/recording/start hit the backend but no Tauri
     // event fired in the WebView).
+    //
     // We hold refresh in a ref so the interval is only (re)created when
-    // status flips, not on every provider state update.
+    // active flips on/off, not on every provider state update. And the
+    // interval is only created when a recording is actually in progress —
+    // running it for the entire app lifetime was 14,400 wasted IPC calls
+    // per 8-hour workday for no benefit.
     const refreshRef = React.useRef(rec.refresh);
     React.useEffect(() => {
         refreshRef.current = rec.refresh;
     });
+    const isActiveForPolling = rec.status !== "idle";
     React.useEffect(() => {
+        if (!isActiveForPolling) return;
         const interval = setInterval(() => {
             void refreshRef.current();
         }, 2000);
         return () => clearInterval(interval);
-    }, [rec.status]);
+    }, [isActiveForPolling]);
 
     React.useEffect(() => {
         // Only tick the clock when actively recording. When paused, freeze
@@ -56,55 +72,146 @@ export function RecordingToast() {
         : 0;
 
     const isActive = rec.status === "recording" || rec.status === "paused";
+    const elapsed = rec.startedAt ? formatElapsed(elapsedMs) : "00:00";
 
-    // Toast lifecycle effect — separate from the clock tick so per-second
-    // nowMs updates don't churn the toast and so we reliably dismiss on
-    // any transition out of active recording (idle).
+    // Stable refs to the provider's actions. The provider's stop/pause/resume
+    // are useCallback with [] deps (stable), but `rec` is a new object on
+    // every render. Without these refs the toast's useCallback with [rec]
+    // would create new handler functions on every render — and the sonner
+    // toast portal may not re-render with the fresh closures on every tick.
+    // The refs guarantee the buttons always call the latest provider methods.
+    const stopRef = React.useRef(rec.stop);
+    const pauseRef = React.useRef(rec.pause);
+    const resumeRef = React.useRef(rec.resume);
     React.useEffect(() => {
-        if (!isActive || !rec.title) {
-            sonnerToast.dismiss("recording-active");
+        stopRef.current = rec.stop;
+        pauseRef.current = rec.pause;
+        resumeRef.current = rec.resume;
+    });
+
+    const handleStop = React.useCallback(async () => {
+        try {
+            await stopRef.current();
+            // The provider surfaces save errors via state.lastError, which
+            // a separate effect below reads to show an error toast. Either
+            // way, dismiss the lingering active-recording toast here — it
+            // has duration: Infinity and would otherwise stay on screen
+            // forever if the error path was taken.
+            sonnerToast.dismiss(TOAST_ID);
+        } catch (err) {
+            // Even on a thrown error, dismiss the lingering active-recording
+            // toast — it has duration: Infinity and would otherwise stay on
+            // screen forever, blocking the user from starting a new recording
+            // via the toast (the in-page controls still work, but the toast
+            // itself is a stuck artifact).
+            sonnerToast.dismiss(TOAST_ID);
+            const message = err instanceof Error ? err.message : "Failed to stop recording";
+            sonnerToast.error(message);
+        }
+    }, []);
+
+    // Surface provider.lastError as a sonner toast. The provider sets this
+    // when save_audio_blob fails inside the onstop handler, OR when start()
+    // encounters a non-recoverable backend error. The effect fires once per
+    // new error value (we keep the last shown one in a ref to avoid replay).
+    const lastShownErrorRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        if (!rec.lastError) {
+            lastShownErrorRef.current = null;
             return;
         }
+        if (rec.lastError === lastShownErrorRef.current) return;
+        lastShownErrorRef.current = rec.lastError;
+        sonnerToast.error(rec.lastError);
+    }, [rec.lastError]);
+
+    // Show a success toast and navigate to the create-event page when a
+    // recording completes successfully. The provider sets lastCompleted
+    // only when save_audio_blob succeeded, so this is a reliable signal
+    // that the audio is on disk and ready to use. The lastCompletedAt
+    // ref ensures we only react to NEW completions, not the initial null
+    // → {…} transition on first mount.
+    const lastSeenCompletedAtRef = React.useRef<number | null>(null);
+    React.useEffect(() => {
+        if (!rec.lastCompleted) return;
+        if (rec.lastCompleted.completedAt === lastSeenCompletedAtRef.current) return;
+        lastSeenCompletedAtRef.current = rec.lastCompleted.completedAt;
+        sonnerToast.success("Recording stopped");
+        // Take the user to the create event page WITHOUT ?mode=record so the
+        // page mounts in its default (upload) mode and doesn't auto-start
+        // another recording. They can re-record or pick the stopped audio.
+        navigateTo("/events/new");
+    }, [rec.lastCompleted]);
+
+    const handlePause = React.useCallback(() => {
+        pauseRef.current();
+    }, []);
+
+    const handleResume = React.useCallback(() => {
+        resumeRef.current();
+    }, []);
+
+    const handleDismiss = React.useCallback(() => {
+        sonnerToast.dismiss(TOAST_ID);
+    }, []);
+
+    const handleOpenRecording = React.useCallback(() => {
+        sonnerToast.dismiss(TOAST_ID);
+        navigateTo("/events/new?mode=record");
+    }, []);
+
+    // Create / update toast (no cleanup — sonner.custom() with the same id
+    // updates the existing toast in place, so we DON'T dismiss + re-create
+    // on every tick of `elapsed`. The previous implementation had a cleanup
+    // that dismissed the toast on every effect re-run, which made the toast
+    // flash off-screen every second — looks like the toast "disappears").
+    React.useEffect(() => {
+        if (!isActive || !rec.title || isOnCreateEventPage) return;
         sonnerToast.custom(
             (toastId) => (
                 <RecordingCard
                     title={rec.title}
-                    elapsed={rec.startedAt ? formatElapsed(elapsedMs) : "00:00"}
+                    elapsed={elapsed}
                     isPaused={isPaused}
-                    onStop={async () => {
-                        try {
-                            await rec.stop();
-                            sonnerToast.dismiss(toastId);
-                            sonnerToast.success("Recording stopped");
-                        } catch {
-                            sonnerToast.error("Failed to stop recording");
-                        }
-                    }}
-                    onPause={() => rec.pause()}
-                    onResume={() => rec.resume()}
-                    onDismiss={() => sonnerToast.dismiss(toastId)}
+                    onStop={handleStop}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onDismiss={handleDismiss}
+                    onOpenRecording={handleOpenRecording}
                 />
             ),
             {
-                id: "recording-active",
+                id: TOAST_ID,
                 duration: Infinity,
                 position: "top-center",
             }
         );
-        // Cleanup on unmount or when deps flip back to inactive — guarantees
-        // the toast disappears when the user stops recording.
-        return () => {
-            sonnerToast.dismiss("recording-active");
-        };
-        // elapsedMs is intentionally excluded — it ticks via nowMs in the
-        // separate clock effect below, not by re-creating the toast.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isActive, isPaused, rec.title, rec.startedAt, rec.stop, rec.pause, rec.resume]);
+    }, [
+        isActive,
+        isPaused,
+        isOnCreateEventPage,
+        rec.title,
+        elapsed,
+        handleStop,
+        handlePause,
+        handleResume,
+        handleDismiss,
+        handleOpenRecording,
+    ]);
+
+    // Separate dismiss effect — runs when recording ends OR when the user
+    // navigates to the create event page. Kept apart from the create/update
+    // effect so the per-second `elapsed` ticks don't dismiss the toast.
+    React.useEffect(() => {
+        if (!isActive || isOnCreateEventPage) {
+            sonnerToast.dismiss(TOAST_ID);
+        }
+    }, [isActive, isOnCreateEventPage]);
 
     return null;
 }
 
-function RecordingCard({ title, elapsed, isPaused, onStop, onPause, onResume, onDismiss }: {
+function RecordingCard({ title, elapsed, isPaused, onStop, onPause, onResume, onDismiss, onOpenRecording }: {
     title: string;
     elapsed: string;
     isPaused: boolean;
@@ -112,51 +219,77 @@ function RecordingCard({ title, elapsed, isPaused, onStop, onPause, onResume, on
     onPause: () => void;
     onResume: () => void;
     onDismiss: () => void;
+    onOpenRecording: () => void;
 }) {
+    // Button clicks stop propagation so they trigger their own actions
+    // instead of opening the create event page.
+    const stop = (e: React.MouseEvent) => e.stopPropagation();
     return (
-        <div className="pointer-events-auto flex w-[380px] items-start gap-3 rounded-xl border border-border/60 bg-zinc-900 px-4 py-3 text-zinc-100 shadow-2xl ring-1 ring-black/20">
-            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-500/20">
-                <Mic className="size-4 text-violet-400" />
+        <div
+            className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-border bg-popover py-1.5 pl-1.5 pr-1.5 text-popover-foreground shadow-2xl ring-1 ring-black/5 dark:ring-white/10 cursor-pointer hover:bg-accent/30 transition-colors"
+            onClick={onOpenRecording}
+            role="button"
+            tabIndex={0}
+            aria-label={`Open recording for ${title}`}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onOpenRecording();
+                }
+            }}
+        >
+            <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/20 shrink-0">
+                <Mic className="size-4 text-violet-500" />
             </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                    <span className="relative flex size-2">
-                        <span
-                            className={cn(
-                                "absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75",
-                                isPaused ? "" : "animate-ping"
-                            )}
-                        ></span>
-                        <span
-                            className={cn(
-                                "relative inline-flex size-2 rounded-full",
-                                isPaused ? "bg-amber-500" : "bg-red-500"
-                            )}
-                        ></span>
-                    </span>
-                    <p className="text-sm font-medium leading-tight truncate">
-                        {isPaused ? "Paused:" : "Recording:"} {title}
-                    </p>
-                </div>
-                <p className="mt-0.5 text-xs text-zinc-400 tabular-nums">{elapsed}</p>
-                <div className="mt-2 flex gap-2">
-                    {isPaused ? (
-                        <Button size="sm" variant="outline" onClick={onResume} className="h-7 text-xs bg-zinc-800 text-zinc-100 border-zinc-700 hover:bg-zinc-700 hover:text-zinc-50">
-                            <Play className="size-3 mr-1" />Resume
-                        </Button>
-                    ) : (
-                        <Button size="sm" variant="outline" onClick={onPause} className="h-7 text-xs bg-zinc-800 text-zinc-100 border-zinc-700 hover:bg-zinc-700 hover:text-zinc-50">
-                            <Pause className="size-3 mr-1" />Pause
-                        </Button>
+            <span className="relative flex size-2 shrink-0">
+                <span
+                    className={cn(
+                        "absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75",
+                        isPaused ? "" : "animate-ping"
                     )}
-                    <Button size="sm" variant="destructive" onClick={onStop} className="h-7 text-xs">
-                        <Square className="size-3 mr-1" />Stop
-                    </Button>
-                </div>
+                ></span>
+                <span
+                    className={cn(
+                        "relative inline-flex size-2 rounded-full",
+                        isPaused ? "bg-amber-500" : "bg-red-500"
+                    )}
+                ></span>
+            </span>
+            <span className="text-sm font-medium truncate max-w-[180px]">{title}</span>
+            <span className="text-sm text-muted-foreground tabular-nums shrink-0">{elapsed}</span>
+            <div className="flex items-center gap-0.5 ml-1" onClick={stop}>
+                {isPaused ? (
+                    <button
+                        onClick={onResume}
+                        aria-label="Resume"
+                        className="flex size-8 items-center justify-center rounded-full hover:bg-accent text-foreground transition-colors"
+                    >
+                        <Play className="size-4" />
+                    </button>
+                ) : (
+                    <button
+                        onClick={onPause}
+                        aria-label="Pause"
+                        className="flex size-8 items-center justify-center rounded-full hover:bg-accent text-foreground transition-colors"
+                    >
+                        <Pause className="size-4" />
+                    </button>
+                )}
+                <button
+                    onClick={onStop}
+                    aria-label="Stop"
+                    className="flex size-8 items-center justify-center rounded-full hover:bg-destructive/10 text-destructive transition-colors"
+                >
+                    <Square className="size-4" />
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+                    aria-label="Dismiss"
+                    className="flex size-8 items-center justify-center rounded-full hover:bg-accent text-muted-foreground transition-colors"
+                >
+                    <X className="size-4" />
+                </button>
             </div>
-            <button onClick={onDismiss} aria-label="Dismiss" className="text-zinc-500 hover:text-zinc-300">
-                <X className="size-4" />
-            </button>
         </div>
     );
 }

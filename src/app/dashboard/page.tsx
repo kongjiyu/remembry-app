@@ -193,7 +193,7 @@ export default function DashboardPage() {
             meeting: m,
         })),
         ...notes
-            .filter(n => n.display_name && !n.display_name.startsWith('project-'))
+            .filter(n => n.display_name && !n.display_name.startsWith('project-') && !n.id.startsWith('meeting-transcript/'))
             .map<ActivityItem>(n => ({
                 kind: 'note',
                 id: n.id,
@@ -243,7 +243,7 @@ export default function DashboardPage() {
                                                 if (e.key === "Enter") commitEditName();
                                                 else if (e.key === "Escape") cancelEditName();
                                             }}
-                                            placeholder="Your name"
+                                            placeholder="Creator"
                                             maxLength={40}
                                             className="h-10 w-56 text-2xl font-semibold border-primary/30 focus-visible:ring-primary/40"
                                         />
@@ -272,7 +272,7 @@ export default function DashboardPage() {
                                         onClick={startEditName}
                                         className="font-semibold text-primary hover:underline"
                                     >
-                                        set your name
+                                        Creator
                                     </button>
                                 )}
                             </CardTitle>
@@ -286,16 +286,18 @@ export default function DashboardPage() {
                                     // Styled Select matches the rest of the UI. Radix
                                     // handles keyboard nav, theme-aware dropdown panel,
                                     // and focus ring — raw <select> did none of that.
-                                    <Select value={selectedAskProjectId} onValueChange={setSelectedAskProjectId}>
-                                        <SelectTrigger className="w-full max-w-xs h-9 px-3 rounded-lg border-primary/20 bg-background/50 backdrop-blur-sm text-sm shadow-sm">
-                                            <SelectValue placeholder="Select project" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {projects.map(p => (
-                                                <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <div className="w-full max-w-xs">
+                                        <Select value={selectedAskProjectId} onValueChange={setSelectedAskProjectId}>
+                                            <SelectTrigger className="w-full h-9 px-3 rounded-lg border-primary/20 bg-background/50 backdrop-blur-sm text-sm shadow-sm">
+                                                <SelectValue placeholder="Select project" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {projects.map(p => (
+                                                    <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 ) : (
                                     <p className="text-sm text-muted-foreground">Create a project before asking Remembry.</p>
                                 )}

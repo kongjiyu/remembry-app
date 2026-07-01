@@ -85,6 +85,30 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         checkPermission();
     }, []);
 
+    // On mount, tear down the backend session only if the React state
+    // claims recording/paused but there is no live MediaRecorder. This
+    // guards against the "phantom UI" — a stale React state that survived
+    // a full page reload while the backend still has an active session.
+    //
+    // We do NOT call provider.stop() unconditionally: that would also kill
+    // legitimate live recordings when the user simply navigates between
+    // pages (RecordingProvider lives at the root layout, so provider.status
+    // stays "recording" while the user moves around the app). Killing the
+    // live recorder on every AudioRecorder mount is more harmful than the
+    // phantom-UI bug it was originally written to address — the phantom
+    // scenario is also covered by the auto-start effect on AudioRecorder,
+    // which catches the "already in progress" error from the backend and
+    // surfaces it via the existing error UI.
+    useEffect(() => {
+        const t = setTimeout(() => {
+            if (provider.status === "recording" || provider.status === "paused") {
+                void provider.stopIfOrphaned();
+            }
+        }, 250);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // When the provider reports a completed recording, mirror its blob
     // into our local state so the <AudioRecorder> preview can show the
     // "Use Recording" panel. The provider keeps the blob in memory and
@@ -106,21 +130,34 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     // When the provider starts a recording (from MCP or from this hook), we
     // attach a parallel local AudioContext for the visualizer. The actual
     // audio capture lives in the provider's MediaRecorder.
+    //
+    // The dep array is intentionally just [providerActive] — pause/resume
+    // must NOT re-acquire getUserMedia or build a new AudioContext, since
+    // the same stream can be reused while toggling pause on the underlying
+    // MediaRecorder. Re-running on pause/resume was the source of a stream
+    // leak: each cycle would acquire a fresh stream and orphan the previous
+    // one (its tracks never stopped, the AudioContext was never closed).
     useEffect(() => {
-        if (!providerActive) {
-            // Stop local UI bits. Wrap cleanup-driven setState in a
-            // microtask so React's lint rule (no synchronous setState in
-            // effect bodies) doesn't fire — the actual reset still
-            // happens before the next paint via the deferred callback.
-            queueMicrotask(() => setAnalyser(null));
+        // Helper: tear down the current visualiser stream + AudioContext
+        // synchronously. Used on the "recording ended" path and as part
+        // of the cleanup so we never leave a dangling getUserMedia stream
+        // when this effect re-runs or unmounts.
+        const teardown = () => {
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach((track) => track.stop());
                 streamRef.current = null;
             }
             if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-                audioContextRef.current.close().catch(() => undefined);
+                void audioContextRef.current.close().catch(() => undefined);
                 audioContextRef.current = null;
             }
+            sourceRef.current = null;
+            // Defer setState out of the effect body to satisfy react-hooks lint.
+            queueMicrotask(() => setAnalyser(null));
+        };
+
+        if (!providerActive) {
+            teardown();
             return;
         }
         // While provider is recording, attempt to attach a visualizer
@@ -155,8 +192,9 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         })();
         return () => {
             cancelled = true;
+            teardown();
         };
-    }, [providerActive, providerRecording, provider.startedAt]);
+    }, [providerActive]);
 
     // Single source of truth for the duration timer. Always clear the
     // previous timer before deciding what to do — eliminates the race
@@ -235,6 +273,14 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
 
     // Forward to provider — the provider owns the single MediaRecorder.
     const startRecording = useCallback(async () => {
+        // Skip if the provider already has a recording going (e.g. we just
+        // navigated from the recording toast to /events/new?mode=record
+        // and refreshFromBackend synced state.status to "recording").
+        // Without this guard, provider.start() would hit the backend's
+        // "A recording is already in progress" error.
+        if (provider.status === "recording" || provider.status === "paused") {
+            return;
+        }
         setError(null);
         if (audioUrl) {
             URL.revokeObjectURL(audioUrl);

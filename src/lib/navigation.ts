@@ -48,10 +48,39 @@ export function normalizeInternalHref(href: string): string {
 }
 
 /**
+ * Module-level navigation guard. The `<NavigationBlocker />` component
+ * registers a guard when a recording is active; the guard resolves
+ * `true` to allow the navigation, `false` to block it. Returns a
+ * promise so callers can `await` the user's decision.
+ *
+ * Why module-level: `navigateTo` is a free function (not a hook) and is
+ * called from many places — toast success handlers, link click handlers,
+ * programmatic flows. Pushing the guard through a React context would
+ * require refactoring every call site. The module-level slot is set by
+ * exactly one component (the layout's `<NavigationBlocker />`) and
+ * cleared on unmount / when the recording ends.
+ */
+type NavigationGuard = (href: string) => Promise<boolean>;
+let activeGuard: NavigationGuard | null = null;
+
+export function setNavigationGuard(fn: NavigationGuard | null): void {
+  activeGuard = fn;
+}
+
+/**
  * Navigate to an internal page using native browser navigation.
  * External URLs and special links are passed through as-is.
+ *
+ * If a navigation guard is registered (typically because a recording is
+ * active), the guard is awaited first. A `false` return aborts the
+ * navigation — the user has chosen to stay.
  */
-export function navigateTo(href: string, options?: { replace?: boolean }): void {
+export async function navigateTo(href: string, options?: { replace?: boolean }): Promise<void> {
+  if (activeGuard && isInternalHref(href)) {
+    const allowed = await activeGuard(href);
+    if (!allowed) return;
+  }
+
   if (!isInternalHref(href)) {
     // External or special URLs: let the browser handle them naturally
     if (options?.replace) {

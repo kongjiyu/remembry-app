@@ -263,6 +263,7 @@ pub fn run() {
                 app: api_app,
                 last_request: Arc::new(tokio::sync::Mutex::new(std::time::Instant::now())),
                 recording: Arc::new(tokio::sync::Mutex::new(None)),
+                last_completed_recording: Arc::new(tokio::sync::Mutex::new(None)),
             });
             let router = api::create_router(api_state.clone());
             // Register ApiState so Tauri commands can retrieve it via app.state::<Arc<ApiState>>().

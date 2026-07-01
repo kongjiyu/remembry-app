@@ -26,6 +26,26 @@ export default function NotesPage() {
     const [search, setSearch] = React.useState("");
     const [showNew, setShowNew] = React.useState(false);
 
+    // Match the Events page date format ("Jun 23, 2026 · 01:01 AM") so the
+    // Notes grid feels consistent with the rest of the app and avoids the
+    // locale-dependent "23/06/2026, 01.01.12" output that `toLocaleString()`
+    // produces on non-en-US systems.
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return "Unknown";
+        return new Date(dateString).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        });
+    };
+    const formatTime = (dateString?: string) => {
+        if (!dateString) return "";
+        return new Date(dateString).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    };
+
     const fetchAll = React.useCallback(async () => {
         try {
             setLoading(true);
@@ -43,20 +63,29 @@ export default function NotesPage() {
 
     const projectMap = React.useMemo(() => Object.fromEntries(projects.map(p => [p.id, p.display_name])), [projects]);
 
-    const filtered = notes.filter(n =>
-        n.display_name.toLowerCase().includes(search.toLowerCase()) ||
-        n.content.toLowerCase().includes(search.toLowerCase())
-    );
+    // Notes page shows only user-created / imported notes.
+    // Meeting transcripts are also stored in `project_documents` by the
+    // upload pipeline (uploads.rs writes them with id `meeting-transcript/<uuid>`),
+    // so filter them out here — they belong on the meeting detail page.
+    const filtered = notes
+        .filter(n => !n.id.startsWith("meeting-transcript/"))
+        .filter(n =>
+            n.display_name.toLowerCase().includes(search.toLowerCase()) ||
+            n.content.toLowerCase().includes(search.toLowerCase())
+        );
 
     return (
         <DashboardLayout title="Notes" breadcrumbs={[{ label: "Notes" }]}>
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1 min-w-[200px]">
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row gap-4 justify-between">
+                    <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search notes..." className="pl-9" />
+                        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search notes..." className="pl-10" />
                     </div>
-                    <Button onClick={() => setShowNew(true)}><Plus className="size-4 mr-1" />New Note</Button>
+                    <Button onClick={() => setShowNew(true)} className="gap-2">
+                        <Plus className="size-4" />
+                        New Note
+                    </Button>
                 </div>
 
                 {loading ? (
@@ -69,25 +98,22 @@ export default function NotesPage() {
                         action={notes.length === 0 ? { label: "Create note", onClick: () => setShowNew(true) } : undefined}
                     />
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {filtered.map(n => (
                             <AppLink key={n.id} href={`/notes/detail?id=${n.id}`} className="block">
                                 <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                                    <CardContent className="p-4 flex flex-col h-full">
+                                    <CardContent className="p-4 flex flex-col h-full gap-3">
                                         <div className="flex items-start justify-between gap-2">
                                             <p className="font-semibold truncate">{n.display_name}</p>
                                             <FileText className="size-4 text-muted-foreground shrink-0" />
                                         </div>
-                                        <p className="mt-2 text-sm text-muted-foreground line-clamp-3 flex-1">
-                                            {n.content ? n.content.slice(0, 200) : <span className="italic">Empty note</span>}
-                                        </p>
-                                        <div className="mt-3 flex items-center justify-between">
+                                        <div className="mt-auto flex items-center justify-between">
                                             <Badge variant="secondary" className="gap-1">
                                                 <FolderKanban className="size-3" />
                                                 {projectMap[n.project_id] || "Unknown"}
                                             </Badge>
                                             <span className="text-xs text-muted-foreground">
-                                                {new Date(n.created_at).toLocaleDateString()}
+                                                {formatDate(n.created_at)} · {formatTime(n.created_at)}
                                             </span>
                                         </div>
                                     </CardContent>

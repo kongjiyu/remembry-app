@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { AudioRecorder, AudioRecorderHandle } from "@/components/ui/audio-recorder";
+import { AudioRecorder } from "@/components/ui/audio-recorder";
 import { Upload, Mic, FileAudio, FileText, X, Loader2, FolderKanban, Plus, Download, Tag, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeMeeting, countMeetingsByProject } from "@/lib/meetingViews";
@@ -161,9 +161,6 @@ export default function NewEventPage() {
     const [showDiscardDialog, setShowDiscardDialog] = useState(false);
     const [pendingMode, setPendingMode] = useState<InputMode | null>(null);
     const [hasUnsavedRecording, setHasUnsavedRecording] = useState(false);
-
-    // Ref for AudioRecorder (exposes start/stop for Tauri event bridge)
-    const audioRecorderRef = useRef<AudioRecorderHandle>(null);
 
     // Create project dialog
     const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
@@ -644,7 +641,7 @@ export default function NewEventPage() {
                                 </label>
                             </div>
                         ) : (
-                            <AudioRecorder ref={audioRecorderRef} onRecordingComplete={handleRecordingComplete} autoStart={shouldAutoStart} onUnsavedRecordingChange={setHasUnsavedRecording} />
+                            <AudioRecorder onRecordingComplete={handleRecordingComplete} autoStart={shouldAutoStart} onUnsavedRecordingChange={setHasUnsavedRecording} />
                         )}
                     </CardContent>
                 </Card>

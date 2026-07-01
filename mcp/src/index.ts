@@ -542,6 +542,204 @@ const MAX_CHUNK_COUNT = 500;
 const CHUNK_RETRY_ATTEMPTS = 3;
 const CHUNK_RETRY_BASE_MS = 1000;  // exponential backoff: 1s, 2s, 4s
 
+/**
+ * Drive the existing Tauri upload pipeline for a single file. The MCP
+ * previously inlined this logic in `remembry_upload_audio`; both that
+ * tool and the new `remembry_upload_recording` go through here so the
+ * streaming, retry, and polling behavior is identical.
+ *
+ * Returns the final job status (and meeting_id once processing is
+ * complete) when the job reaches a terminal state, or `timed_out: true`
+ * if the deadline expires first.
+ */
+async function uploadFileThroughPipeline(opts: {
+  audioPath: string;
+  projectId: string;
+  title: string;
+  context: string;
+  fileType: "audio" | "video" | "text";
+  mimeType?: string;
+  eventType: string;
+  eventTags: string[];
+  pollIntervalMs: number;
+  maxWaitMs: number;
+  sourceLabel: string;        // for the user-facing result: "file" or "recording"
+  sourceHint?: string;        // optional note (e.g. "picked up from /api/record/last")
+}): Promise<{ content: { type: "text"; text: string }[]; isError?: boolean }> {
+  const { audioPath, projectId, title, context, fileType, mimeType, eventType, eventTags, pollIntervalMs, maxWaitMs } = opts;
+
+  // ── Validate file ────────────────────────────────────────────────────
+  if (!fs.existsSync(audioPath)) {
+    return {
+      content: [{ type: "text", text: JSON.stringify({ error: `File not found: ${audioPath}` }, null, 2) }],
+      isError: true,
+    };
+  }
+  const stat = fs.statSync(audioPath);
+  const fileSize = stat.size;
+
+  if (fileSize > MAX_FILE_SIZE) {
+    return {
+      content: [{ type: "text", text: JSON.stringify({
+        error: `File too large: ${fileSize} bytes (max ${MAX_FILE_SIZE})`,
+        hint: "Pre-process / compress the audio, or contact maintainers to raise the limit.",
+      }, null, 2) }],
+      isError: true,
+    };
+  }
+  const totalChunks = Math.ceil(fileSize / UPLOAD_CHUNK_SIZE);
+  if (totalChunks > MAX_CHUNK_COUNT) {
+    return {
+      content: [{ type: "text", text: JSON.stringify({
+        error: `Too many chunks: ${totalChunks} (max ${MAX_CHUNK_COUNT})`,
+        hint: "Use a larger chunk size or a smaller file. Bump MAX_CHUNK_COUNT in mcp/src/index.ts if you have a real need.",
+      }, null, 2) }],
+      isError: true,
+    };
+  }
+
+  const fileName = path.basename(audioPath);
+  const inferredMime = mimeType || inferMimeFromExtension(fileName, fileType);
+
+  // ── Pre-flight: app reachable? ───────────────────────────────────────
+  try {
+    await apiFetch("/api/health");
+  } catch (e: any) {
+    return {
+      content: [{ type: "text", text: JSON.stringify({
+        error: "Remembry desktop app is not running on http://127.0.0.1:17890",
+        hint: "Open the Remembry app first, then retry.",
+        detail: e.message,
+      }, null, 2) }],
+      isError: true,
+    };
+  }
+
+  // ── Phase 1: start_upload ────────────────────────────────────────────
+  const startResp = await apiFetch("/api/upload/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_name: fileName, total_chunks: totalChunks }),
+  });
+  if (startResp.status !== "ok") {
+    return {
+      content: [{ type: "text", text: JSON.stringify({ error: "start_upload failed", detail: startResp }, null, 2) }],
+      isError: true,
+    };
+  }
+  const uploadId = startResp.upload_id;
+
+  // ── Phase 2: stream chunks (sequential, base64, retry-on-transient) ─
+  await new Promise<void>((resolve, reject) => {
+    const stream = fs.createReadStream(audioPath, { highWaterMark: UPLOAD_CHUNK_SIZE });
+    let chunkIndex = 0;
+
+    stream.on("data", async (chunkBytes: string | Buffer) => {
+      const buffer = Buffer.isBuffer(chunkBytes) ? chunkBytes : Buffer.from(chunkBytes);
+      stream.pause();
+      const myIndex = chunkIndex++;
+      const chunkB64 = buffer.toString("base64");
+
+      let lastErr: unknown = null;
+      for (let attempt = 1; attempt <= CHUNK_RETRY_ATTEMPTS; attempt++) {
+        try {
+          const resp = await apiFetch("/api/upload/chunk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              upload_id: uploadId,
+              chunk_index: myIndex,
+              chunk_data: chunkB64,
+            }),
+          });
+          if (resp.status === "ok") {
+            lastErr = null;
+            break;
+          }
+          lastErr = resp;
+        } catch (e) {
+          lastErr = e;
+        }
+        if (attempt < CHUNK_RETRY_ATTEMPTS) {
+          const backoff = CHUNK_RETRY_BASE_MS * Math.pow(2, attempt - 1);
+          await new Promise(r => setTimeout(r, backoff));
+        }
+      }
+
+      if (lastErr) {
+        stream.destroy();
+        reject(new Error(`Chunk ${myIndex + 1}/${totalChunks} failed after ${CHUNK_RETRY_ATTEMPTS} attempts: ${JSON.stringify(lastErr)}`));
+        return;
+      }
+
+      stream.resume();
+    });
+
+    stream.on("end", () => resolve());
+    stream.on("error", (err) => reject(err));
+  }).catch(err => {
+    throw err;
+  });
+
+  // ── Phase 3: enqueue processing ──────────────────────────────────────
+  const procResp = await apiFetch("/api/upload/process", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      upload_id: uploadId,
+      project_id: projectId,
+      title,
+      context: context || "",
+      file_type: fileType,
+      mime_type: inferredMime,
+      event_type: eventType,
+      event_tags: eventTags,
+      notes_languages: ["en"],
+    }),
+  });
+  if (procResp.status !== "ok") {
+    return {
+      content: [{ type: "text", text: JSON.stringify({ error: "process failed", detail: procResp }, null, 2) }],
+      isError: true,
+    };
+  }
+  const jobId = procResp.job_id;
+
+  // ── Phase 4: poll job status until terminal ──────────────────────────
+  const deadline = Date.now() + maxWaitMs;
+  let lastStatus: any = null;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+    const statusResp = await apiFetch(`/api/upload/job?job_id=${encodeURIComponent(jobId)}`);
+    if (statusResp.status === "ok" && statusResp.job) {
+      lastStatus = statusResp.job;
+      if (["completed", "failed", "cancelled", "cleanup_pending"].includes(lastStatus.status)) {
+        break;
+      }
+    }
+  }
+
+  const isTerminal = lastStatus && ["completed", "failed", "cancelled", "cleanup_pending"].includes(lastStatus.status);
+  return {
+    content: [{ type: "text", text: JSON.stringify({
+      job_id: jobId,
+      meeting_id: lastStatus?.meeting_id || null,
+      upload_id: uploadId,
+      final_status: lastStatus?.status || (isTerminal ? "unknown" : "timeout"),
+      progress: lastStatus?.progress,
+      message: lastStatus?.message,
+      error: lastStatus?.error,
+      file_size: fileSize,
+      total_chunks: totalChunks,
+      title,
+      source: opts.sourceLabel,
+      source_hint: opts.sourceHint,
+      timed_out: !isTerminal,
+    }, null, 2) }],
+    isError: lastStatus?.status === "failed",
+  };
+}
+
 server.tool(
   "remembry_upload_audio",
   "Upload an audio (or video/text) file to Remembry for transcription and knowledge extraction. Requires the Remembry desktop app to be running. Polls until processing completes and returns the new meeting ID. Use remembry_list_projects to find a project_id.",
@@ -558,44 +756,57 @@ server.tool(
     max_wait_ms: z.number().optional().default(600000).describe("Maximum wait time in ms before giving up (default: 10 minutes)"),
   },
   async ({ audio_path, project_id, title, context, file_type, mime_type, event_type, event_tags, poll_interval_ms, max_wait_ms }) => {
-    // ── Validate file ────────────────────────────────────────────────────
-    if (!fs.existsSync(audio_path)) {
-      return {
-        content: [{ type: "text", text: JSON.stringify({ error: `File not found: ${audio_path}` }, null, 2) }],
-        isError: true,
-      };
-    }
-    const stat = fs.statSync(audio_path);
-    const fileSize = stat.size;
+    return uploadFileThroughPipeline({
+      audioPath: audio_path,
+      projectId: project_id,
+      title,
+      context: context || "",
+      fileType: file_type,
+      mimeType: mime_type,
+      eventType: event_type,
+      eventTags: event_tags,
+      pollIntervalMs: poll_interval_ms,
+      maxWaitMs: max_wait_ms,
+      sourceLabel: "file",
+    });
+  }
+);
 
-    // ── Size / chunk-count guards ────────────────────────────────────────
-    // Refuse obviously broken inputs before opening a single HTTP connection.
-    // Catches the "user drags in a 10 GB file by mistake" case where the
-    // pipeline would otherwise allocate ~13 GB of base64 JSON.
-    if (fileSize > MAX_FILE_SIZE) {
-      return {
-        content: [{ type: "text", text: JSON.stringify({
-          error: `File too large: ${fileSize} bytes (max ${MAX_FILE_SIZE})`,
-          hint: "Pre-process / compress the audio, or contact maintainers to raise the limit.",
-        }, null, 2) }],
-        isError: true,
-      };
-    }
-    const totalChunks = Math.ceil(fileSize / UPLOAD_CHUNK_SIZE);
-    if (totalChunks > MAX_CHUNK_COUNT) {
-      return {
-        content: [{ type: "text", text: JSON.stringify({
-          error: `Too many chunks: ${totalChunks} (max ${MAX_CHUNK_COUNT})`,
-          hint: "Use a larger chunk size or a smaller file. Bump MAX_CHUNK_COUNT in mcp/src/index.ts if you have a real need.",
-        }, null, 2) }],
-        isError: true,
-      };
-    }
+// ── Tool: upload_recording ──────────────────────────────────────────────
+//
+// Bridges the gap between `remembry_start_recording` /
+// `remembry_stop_recording` (which capture audio to the app's local
+// temp_uploads directory) and the chunked upload pipeline. The MCP
+// server itself can't read SQLite to know about the recording, so it
+// asks the desktop app for the most recent completed recording's file
+// path via `/api/record/last` and streams that file through the same
+// upload pipeline `remembry_upload_audio` uses.
+//
+// Typical flow:
+//
+//   1. remembry_start_recording (title="Sprint Planning")
+//   2. ... user records audio in the Remembry app ...
+//   3. remembry_stop_recording            (audio flushed to temp_uploads)
+//   4. remembry_upload_recording          (this tool — pipes the file
+//                                          into the pipeline)
 
-    const fileName = path.basename(audio_path);
-    const inferredMime = mime_type || inferMimeFromExtension(fileName, file_type);
-
-    // ── Pre-flight: app reachable? ───────────────────────────────────────
+server.tool(
+  "remembry_upload_recording",
+  "Upload the most recently completed recording to Remembry for transcription and knowledge extraction. Run remembry_start_recording, then remembry_stop_recording, then this tool. Polls until processing completes and returns the new meeting ID.",
+  {
+    project_id: z.string().describe("Project ID (e.g. 'project_xxx') to attach the meeting to"),
+    title: z.string().optional().describe("Override the meeting title (default: title from the recording)"),
+    context: z.string().optional().default("").describe("Optional context/description for the meeting"),
+    file_type: z.enum(["audio", "video", "text"]).optional().default("audio").describe("File type (default: audio)"),
+    mime_type: z.string().optional().describe("MIME type override (default: inferred from file extension)"),
+    event_type: z.enum(["meeting", "interview", "standup", "lecture"]).optional().default("meeting").describe("Event type (default: meeting)"),
+    event_tags: z.array(z.string()).optional().default([]).describe("Tags for the event"),
+    poll_interval_ms: z.number().optional().default(2000).describe("Job status poll interval in milliseconds (default: 2000)"),
+    max_wait_ms: z.number().optional().default(600000).describe("Maximum wait time in ms before giving up (default: 10 minutes)"),
+    consume: z.boolean().optional().default(true).describe("If true, clear the last-completed-recording slot after a successful upload so the next call doesn't pick up the same file (default: true)"),
+  },
+  async ({ project_id, title, context, file_type, mime_type, event_type, event_tags, poll_interval_ms, max_wait_ms, consume }) => {
+    // Pre-flight: app reachable?
     try {
       await apiFetch("/api/health");
     } catch (e: any) {
@@ -609,140 +820,65 @@ server.tool(
       };
     }
 
-    // ── Phase 1: start_upload ────────────────────────────────────────────
-    const startResp = await apiFetch("/api/upload/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_name: fileName, total_chunks: totalChunks }),
-    });
-    if (startResp.status !== "ok") {
+    // Look up the most recent recording. The desktop app populates this
+    // from inside save_audio_blob, so it appears as soon as the user
+    // hits Stop in the recording UI (or remembry_stop_recording returns).
+    const lastResp = await apiFetch("/api/record/last");
+    if (lastResp.status !== "ok" || !lastResp.recording) {
       return {
-        content: [{ type: "text", text: JSON.stringify({ error: "start_upload failed", detail: startResp }, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify({
+          error: "No completed recording available",
+          hint: "Call remembry_start_recording, then remembry_stop_recording, then try again.",
+          last_response: lastResp,
+        }, null, 2) }],
         isError: true,
       };
     }
-    const uploadId = startResp.upload_id;
 
-    // ── Phase 2: stream chunks (sequential, base64, retry-on-transient) ─
-    //
-    // Reads the file via streaming fs.createReadStream + async iterator
-    // instead of fs.readFileSync, so a 1 GB lecture never sits in memory
-    // twice (raw + base64). Each chunk is base64'd and POSTed immediately.
-    //
-    // Transient HTTP failures (ECONNRESET, 5xx, timeouts) retry up to
-    // CHUNK_RETRY_ATTEMPTS times with exponential backoff. The chunk
-    // protocol is idempotent on the server side (append_upload_chunk just
-    // appends bytes), so retrying the same chunk_index is safe.
-    await new Promise<void>((resolve, reject) => {
-      // Default encoding is null (binary Buffer chunks). Cast explicitly
-      // because Node's createReadStream types still permit string fallback.
-      const stream = fs.createReadStream(audio_path, { highWaterMark: UPLOAD_CHUNK_SIZE });
-      let chunkIndex = 0;
-
-      stream.on("data", async (chunkBytes: string | Buffer) => {
-        const buffer = Buffer.isBuffer(chunkBytes) ? chunkBytes : Buffer.from(chunkBytes);
-        // Pause while we POST so backpressure prevents unbounded buffering.
-        stream.pause();
-        const myIndex = chunkIndex++;
-        const chunkB64 = chunkBytes.toString("base64");
-
-        let lastErr: unknown = null;
-        for (let attempt = 1; attempt <= CHUNK_RETRY_ATTEMPTS; attempt++) {
-          try {
-            const resp = await apiFetch("/api/upload/chunk", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                upload_id: uploadId,
-                chunk_index: myIndex,
-                chunk_data: chunkB64,
-              }),
-            });
-            if (resp.status === "ok") {
-              lastErr = null;
-              break;
-            }
-            lastErr = resp;
-          } catch (e) {
-            lastErr = e;
-          }
-          if (attempt < CHUNK_RETRY_ATTEMPTS) {
-            const backoff = CHUNK_RETRY_BASE_MS * Math.pow(2, attempt - 1);
-            await new Promise(r => setTimeout(r, backoff));
-          }
-        }
-
-        if (lastErr) {
-          stream.destroy();
-          reject(new Error(`Chunk ${myIndex + 1}/${totalChunks} failed after ${CHUNK_RETRY_ATTEMPTS} attempts: ${JSON.stringify(lastErr)}`));
-          return;
-        }
-
-        stream.resume();
-      });
-
-      stream.on("end", () => resolve());
-      stream.on("error", (err) => reject(err));
-    }).catch(err => {
-      // Wrap as a tool-friendly error return
-      throw err;
-    });
-
-    // ── Phase 3: enqueue processing ──────────────────────────────────────
-    const procResp = await apiFetch("/api/upload/process", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        upload_id: uploadId,
-        project_id,
-        title,
-        context: context || "",
-        file_type,
-        mime_type: inferredMime,
-        event_type,
-        event_tags,
-        notes_languages: ["en"],
-      }),
-    });
-    if (procResp.status !== "ok") {
+    const rec = lastResp.recording;
+    if (!rec.exists) {
       return {
-        content: [{ type: "text", text: JSON.stringify({ error: "process failed", detail: procResp }, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify({
+          error: "Recording's audio file is no longer on disk",
+          job_id: rec.job_id,
+          audio_path: rec.audio_path,
+          hint: "The file may have been moved or cleaned up. Re-record and try again.",
+        }, null, 2) }],
         isError: true,
       };
     }
-    const jobId = procResp.job_id;
 
-    // ── Phase 4: poll job status until terminal ──────────────────────────
-    const deadline = Date.now() + max_wait_ms;
-    let lastStatus: any = null;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, poll_interval_ms));
-      const statusResp = await apiFetch(`/api/upload/job?job_id=${encodeURIComponent(jobId)}`);
-      if (statusResp.status === "ok" && statusResp.job) {
-        lastStatus = statusResp.job;
-        if (["completed", "failed", "cancelled", "cleanup_pending"].includes(lastStatus.status)) {
-          break;
-        }
+    // Drive the existing pipeline with the recorded file.
+    const result = await uploadFileThroughPipeline({
+      audioPath: rec.audio_path,
+      projectId: project_id,
+      title: title || rec.title || "Recording",
+      context: context || "",
+      fileType: file_type,
+      mimeType: mime_type,
+      eventType: event_type,
+      eventTags: event_tags,
+      pollIntervalMs: poll_interval_ms,
+      maxWaitMs: max_wait_ms,
+      sourceLabel: "recording",
+      sourceHint: `Picked up from /api/record/last (job_id=${rec.job_id}, completed_at=${rec.completed_at_ms})`,
+    });
+
+    // Successful upload → forget the recording so the next call doesn't
+    // re-pick-up the same file. Failures leave it in place so the user
+    // can retry.
+    if (consume && !result.isError) {
+      try {
+        await apiFetch("/api/record/last/clear", { method: "POST" });
+      } catch (e: any) {
+        // Non-fatal: the recording will be returned on subsequent
+        // /api/record/last calls, but the next MCP call can still
+        // pick it up if needed.
+        console.error("[remembry_upload_recording] failed to clear last recording:", e.message);
       }
     }
 
-    const isTerminal = lastStatus && ["completed", "failed", "cancelled", "cleanup_pending"].includes(lastStatus.status);
-    return {
-      content: [{ type: "text", text: JSON.stringify({
-        job_id: jobId,
-        meeting_id: lastStatus?.meeting_id || null,
-        upload_id: uploadId,
-        final_status: lastStatus?.status || (isTerminal ? "unknown" : "timeout"),
-        progress: lastStatus?.progress,
-        message: lastStatus?.message,
-        error: lastStatus?.error,
-        file_size: fileSize,
-        total_chunks: totalChunks,
-        title,
-        timed_out: !isTerminal,
-      }, null, 2) }],
-      isError: lastStatus?.status === "failed",
-    };
+    return result;
   }
 );
 
@@ -1454,17 +1590,46 @@ server.tool(
 
 server.tool(
   "remembry_stop_recording",
-  "Stop the active recording in the Remembry desktop app. The app will transcribe via Gemini automatically.",
+  "Stop the active recording in the Remembry desktop app. After this returns, the audio is flushed to disk and the recording's file path is exposed via /api/record/last. Use remembry_upload_recording (or remembry_upload_audio with the returned audio_path) to push it through the transcription pipeline.",
   {},
   async () => {
     try {
       const result = await apiFetch("/api/record/stop");
+      // Give the WebView a moment to flush the blob to disk — the
+      // /api/record/last slot is populated inside save_audio_blob,
+      // which runs in the onstop handler. If we hit /api/record/last
+      // too quickly the response can still be `none`. The HTTP layer
+      // is local, the WebView is in-process, and onstop typically
+      // completes within a few hundred ms, so 500ms is plenty in
+      // practice; we still tolerate a slow / missing response so the
+      // user always gets a useful return.
+      let lastRecording: any = null;
+      for (let i = 0; i < 5; i++) {
+        try {
+          const last = await apiFetch("/api/record/last");
+          if (last.status === "ok" && last.recording) {
+            lastRecording = last.recording;
+            break;
+          }
+        } catch {
+          // ignore — we'll surface whatever we have
+        }
+        await new Promise((r) => setTimeout(r, 150));
+      }
+
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
             ...result,
-            message: "Recording stop triggered. The app will transcribe and save. Check the app for results.",
+            audio_path: lastRecording?.audio_path || null,
+            job_id: lastRecording?.job_id || null,
+            title: lastRecording?.title || null,
+            size_bytes: lastRecording?.size_bytes || null,
+            message: lastRecording
+              ? "Recording stop triggered and audio flushed. Use remembry_upload_recording to transcribe."
+              : "Recording stop triggered. The audio may still be flushing — call /api/record/last if you need the file path immediately.",
+            next_step: "remembry_upload_recording (with project_id) to transcribe and create the event.",
           }, null, 2),
         }],
       };

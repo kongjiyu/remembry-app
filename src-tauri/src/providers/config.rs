@@ -158,5 +158,40 @@ mod tests {
 
         let json = serde_json::to_string(&TranscriptionModel::WhisperLargeV3Turbo).unwrap();
         assert_eq!(json, "\"whisper_large_v3_turbo\"");
+
+        // Lock in the wire format the frontend sends — see settings page
+        // SelectItem values in src/app/settings/page.tsx. If the frontend
+        // ever drifts back to "llama_33_70b" (with an underscore between
+        // "llama" and "33"), this test fails before the save round-trips.
+        assert_eq!(
+            serde_json::to_string(&ExtractionModel::Llama33_70b).unwrap(),
+            "\"llama33_70b\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ExtractionModel::Llama4Scout).unwrap(),
+            "\"llama4_scout\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ExtractionModel::Qwen3_32b).unwrap(),
+            "\"qwen3_32b\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ExtractionModel::GptOss120b).unwrap(),
+            "\"gpt_oss120b\""
+        );
+    }
+
+    #[test]
+    fn extraction_model_deserializes_frontend_ids() {
+        // The frontend SelectItem values must deserialize into the enum —
+        // save_provider_config rejects unknown variants.
+        let parsed: ExtractionModel = serde_json::from_str("\"llama33_70b\"").unwrap();
+        assert_eq!(parsed, ExtractionModel::Llama33_70b);
+        let parsed: ExtractionModel = serde_json::from_str("\"llama4_scout\"").unwrap();
+        assert_eq!(parsed, ExtractionModel::Llama4Scout);
+        let parsed: ExtractionModel = serde_json::from_str("\"qwen3_32b\"").unwrap();
+        assert_eq!(parsed, ExtractionModel::Qwen3_32b);
+        let parsed: ExtractionModel = serde_json::from_str("\"gpt_oss120b\"").unwrap();
+        assert_eq!(parsed, ExtractionModel::GptOss120b);
     }
 }
